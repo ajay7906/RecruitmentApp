@@ -1,19 +1,164 @@
-import {prisma} from '../../config/database.js';
-import {AppError} from '../../middleware/errorHandler.js';
-import {PUBLIC_ROLES} from './auth.constants.js';
-import {generateAccessToken,generateRefreshToken,hashPassword,hashToken,refreshExpiry,verifyPassword} from './auth.utils.js';
-const safeUserSelect={id:true,email:true,status:true,profile:{select:{firstName:true,lastName:true}},roles:{select:{role:{select:{name:true}}}}};
-const mapUser=u=>({id:u.id,email:u.email,roles:u.roles.map(x=>x.role.name),profile:u.profile?{firstName:u.profile.firstName,lastName:u.profile.lastName}:null});
-async function createSession(tx,userId){const raw=generateRefreshToken();await tx.refreshToken.create({data:{userId,tokenHash:hashToken(raw),expiresAt:refreshExpiry()}});return raw;}
-export async function register(input){
- const email=input.email.trim().toLowerCase();if(!PUBLIC_ROLES.includes(input.role))throw new AppError(403,'ROLE_NOT_ALLOWED','This role cannot be selected during public registration.');
- if(input.role==='RECRUITER'&&input.companyId&&!await prisma.company.findUnique({where:{id:input.companyId},select:{id:true}}))throw new AppError(400,'INVALID_COMPANY','The selected company does not exist.');
- const passwordHash=await hashPassword(input.password);
- try {const result=await prisma.$transaction(async tx=>{const role=await tx.role.findUnique({where:{name:input.role},select:{id:true}});if(!role)throw new AppError(500,'ROLE_NOT_CONFIGURED','Registration role is not configured.');const user=await tx.user.create({data:{email,passwordHash,profile:{create:{firstName:input.firstName,lastName:input.lastName,phone:input.phone}},roles:{create:{roleId:role.id}},...(input.role==='CANDIDATE'?{candidateProfile:{create:{}}}:{recruiterProfile:{create:{companyId:input.companyId}}})},select:safeUserSelect});const refreshToken=await createSession(tx,user.id);return {user,refreshToken};});return {user:mapUser(result.user),accessToken:generateAccessToken(result.user.id),refreshToken:result.refreshToken};}catch(e){if(e.code==='P2002')throw new AppError(409,'EMAIL_EXISTS','An account with this email already exists.');throw e;}
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const env = require('../../config/env');
+const { withTransaction } = require('../../config/db');
+const ApiError = require('../../utils/ApiError');
+const { randomToken, sha256 } = require('../../utils/crypto');
+const repo = require('./auth.repository');
+const mail = require('../../services/email.service');
+
+const HOUR = 60 * 60 * 1000;
+const DUMMY_HASH = bcrypt.hashSync('dummy-password', 12); // equalises timing for unknown emails
+
+const publicUser = (u) => ({
+  id: u.id,
+  email: u.email,
+  fullName: u.full_name,
+  role: u.role,
+  emailVerified: !!u.email_verified_at,
+});
+
+const signAccessToken = (user) =>
+  jwt.sign({ role: user.role }, env.JWT_ACCESS_SECRET, { subject: user.id, expiresIn: env.ACCESS_TOKEN_TTL });
+
+async function issueRefreshToken(user, meta, familyId, client) {
+  const raw = randomToken();
+  const row = await repo.createRefreshToken(
+    {
+      userId: user.id,
+      familyId: familyId || crypto.randomUUID(),
+      tokenHash: sha256(raw),
+      expiresAt: new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * HOUR),
+      userAgent: meta.userAgent,
+      ip: meta.ip,
+    },
+    client
+  );
+  return { raw, id: row.id };
 }
-export async function login(input){const email=input.email.trim().toLowerCase();const user=await prisma.user.findUnique({where:{email},select:{id:true,passwordHash:true,status:true,...safeUserSelect}});if(!user||user.status!=='ACTIVE'||!(await verifyPassword(input.password,user.passwordHash)))throw new AppError(401,'INVALID_CREDENTIALS','Email or password is incorrect.');const refreshToken=await prisma.$transaction(async tx=>{await tx.user.update({where:{id:user.id},data:{lastLoginAt:new Date()}});return createSession(tx,user.id);});return {user:mapUser(user),accessToken:generateAccessToken(user.id),refreshToken};}
-export async function refresh(rawToken){if(!rawToken)throw new AppError(401,'INVALID_REFRESH_TOKEN','Refresh token is invalid or expired.');const tokenHash=hashToken(rawToken);return prisma.$transaction(async tx=>{const stored=await tx.refreshToken.findUnique({where:{tokenHash},select:{id:true,userId:true,expiresAt:true,revokedAt:true,user:{select:{status:true}}}});if(!stored||stored.revokedAt||stored.expiresAt<=new Date()||stored.user.status!=='ACTIVE')throw new AppError(401,'INVALID_REFRESH_TOKEN','Refresh token is invalid or expired.');const revoked=await tx.refreshToken.updateMany({where:{id:stored.id,revokedAt:null},data:{revokedAt:new Date()}});if(!revoked.count)throw new AppError(401,'INVALID_REFRESH_TOKEN','Refresh token is invalid or expired.');const next=await createSession(tx,stored.userId);return {accessToken:generateAccessToken(stored.userId),refreshToken:next};});}
-export async function logout(rawToken){if(rawToken)await prisma.refreshToken.updateMany({where:{tokenHash:hashToken(rawToken),revokedAt:null},data:{revokedAt:new Date()}});}
-export async function logoutAll(userId){await prisma.refreshToken.updateMany({where:{userId,revokedAt:null},data:{revokedAt:new Date()}});}
-export async function currentUser(userId){const user=await prisma.user.findUnique({where:{id:userId},select:{...safeUserSelect,emailVerified:true,candidateProfile:{select:{id:true,headline:true,experienceYears:true,preferredLocation:true}},recruiterProfile:{select:{id:true,designation:true,department:true,company:{select:{id:true,name:true}}}}}});if(!user||user.status!=='ACTIVE')throw new AppError(401,'UNAUTHENTICATED','Authentication required.');return {...mapUser(user),emailVerified:user.emailVerified,candidateProfile:user.candidateProfile,recruiterProfile:user.recruiterProfile};}
-export async function changePassword(userId,input){const user=await prisma.user.findUnique({where:{id:userId},select:{passwordHash:true}});if(!user||!(await verifyPassword(input.currentPassword,user.passwordHash)))throw new AppError(400,'CURRENT_PASSWORD_INVALID','Current password is incorrect.');if(input.currentPassword===input.newPassword)throw new AppError(400,'PASSWORD_UNCHANGED','New password must differ from the current password.');const passwordHash=await hashPassword(input.newPassword);await prisma.$transaction(async tx=>{await tx.user.update({where:{id:userId},data:{passwordHash}});await tx.refreshToken.updateMany({where:{userId,revokedAt:null},data:{revokedAt:new Date()}});});}
+
+async function createAndSendToken(user, type, ttlMs, sender, client) {
+  const raw = randomToken();
+  await repo.invalidateAuthTokens(user.id, type, client);
+  await repo.createAuthToken(
+    { userId: user.id, type, tokenHash: sha256(raw), expiresAt: new Date(Date.now() + ttlMs) },
+    client
+  );
+  return () => sender(user.email, raw).catch((e) => console.error('Email failed', e.message));
+}
+
+exports.register = async ({ fullName, email, password, role }) => {
+  if (await repo.findUserByEmail(email)) throw new ApiError(409, 'Email already registered', 'EMAIL_EXISTS');
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  const { user, sendMail } = await withTransaction(async (client) => {
+    const user = await repo.createUser({ email, passwordHash, fullName, role }, client);
+    const sendMail = await createAndSendToken(user, 'email_verification', 24 * HOUR, mail.sendVerificationEmail, client);
+    return { user, sendMail };
+  });
+  sendMail(); // after commit; swap for a BullMQ job when you add the queue
+  return publicUser(user);
+};
+
+exports.login = async ({ email, password }, meta) => {
+  const user = await repo.findUserByEmail(email);
+  const ok = await bcrypt.compare(password, user?.password_hash || DUMMY_HASH);
+  if (!user || !ok) throw new ApiError(401, 'Invalid email or password', 'INVALID_CREDENTIALS');
+  if (user.status !== 'active') throw new ApiError(403, 'Account suspended', 'ACCOUNT_SUSPENDED');
+  if (!user.email_verified_at) throw new ApiError(403, 'Please verify your email first', 'EMAIL_NOT_VERIFIED');
+
+  const refresh = await issueRefreshToken(user, meta);
+  return { user: publicUser(user), accessToken: signAccessToken(user), refreshToken: refresh.raw };
+};
+
+exports.refresh = async (rawToken, meta) => {
+  if (!rawToken) throw new ApiError(401, 'No refresh token', 'NO_REFRESH_TOKEN');
+
+  // Reuse detection must persist even though we throw -> handled outside the failing transaction
+  let reuseDetectedFamily = null;
+  try {
+    return await withTransaction(async (client) => {
+      const existing = await repo.findRefreshToken(sha256(rawToken), client);
+      if (!existing) throw new ApiError(401, 'Invalid refresh token', 'INVALID_REFRESH_TOKEN');
+      if (existing.revoked_at) {
+        reuseDetectedFamily = existing.family_id;
+        throw new ApiError(401, 'Session expired, please log in again', 'REFRESH_REUSE');
+      }
+      if (existing.expires_at < new Date()) throw new ApiError(401, 'Session expired', 'REFRESH_EXPIRED');
+
+      const user = await repo.findUserById(existing.user_id);
+      if (!user || user.status !== 'active') throw new ApiError(401, 'Account unavailable', 'ACCOUNT_UNAVAILABLE');
+
+      const next = await issueRefreshToken(user, meta, existing.family_id, client);
+      await repo.revokeRefreshToken(existing.id, next.id, client);
+      return { user: publicUser(user), accessToken: signAccessToken(user), refreshToken: next.raw };
+    });
+  } catch (err) {
+    if (reuseDetectedFamily) await repo.revokeFamily(reuseDetectedFamily); // token theft suspected
+    throw err;
+  }
+};
+
+exports.logout = async (rawToken) => {
+  if (!rawToken) return;
+  await withTransaction(async (client) => {
+    const existing = await repo.findRefreshToken(sha256(rawToken), client);
+    if (existing && !existing.revoked_at) await repo.revokeRefreshToken(existing.id, null, client);
+  });
+};
+
+exports.verifyEmail = async (token) => {
+  await withTransaction(async (client) => {
+    const row = await repo.consumeAuthToken(sha256(token), 'email_verification', client);
+    if (!row) throw new ApiError(400, 'Invalid or expired token', 'INVALID_TOKEN');
+    await repo.markEmailVerified(row.user_id, client);
+  });
+};
+
+exports.resendVerification = async (email) => {
+  const user = await repo.findUserByEmail(email);
+  if (!user || user.email_verified_at) return; // never reveal account state
+  const sendMail = await withTransaction((client) =>
+    createAndSendToken(user, 'email_verification', 24 * HOUR, mail.sendVerificationEmail, client)
+  );
+  sendMail();
+};
+
+exports.forgotPassword = async (email) => {
+  const user = await repo.findUserByEmail(email);
+  if (!user || user.status !== 'active') return; // same response either way
+  const sendMail = await withTransaction((client) =>
+    createAndSendToken(user, 'password_reset', HOUR, mail.sendPasswordResetEmail, client)
+  );
+  sendMail();
+};
+
+exports.resetPassword = async ({ token, newPassword }) => {
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await withTransaction(async (client) => {
+    const row = await repo.consumeAuthToken(sha256(token), 'password_reset', client);
+    if (!row) throw new ApiError(400, 'Invalid or expired token', 'INVALID_TOKEN');
+    await repo.updatePassword(row.user_id, passwordHash, client);
+    await repo.markEmailVerified(row.user_id, client); // they proved inbox ownership
+    await repo.revokeAllUserTokens(row.user_id, client); // log out everywhere
+  });
+};
+
+exports.changePassword = async (userId, { currentPassword, newPassword }) => {
+  const user = await repo.findUserById(userId);
+  if (!user?.password_hash || !(await bcrypt.compare(currentPassword, user.password_hash))) {
+    throw new ApiError(400, 'Current password is incorrect', 'WRONG_PASSWORD');
+  }
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await withTransaction(async (client) => {
+    await repo.updatePassword(userId, passwordHash, client);
+    await repo.revokeAllUserTokens(userId, client);
+  });
+};
+
+exports.me = async (userId) => {
+  const user = await repo.findUserById(userId);
+  if (!user) throw new ApiError(404, 'User not found', 'NOT_FOUND');
+  return publicUser(user);
+};

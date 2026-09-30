@@ -1,3 +1,9 @@
-import app from './app.js'; import {env} from './config/env.js'; import {prisma} from './config/database.js';
-const server=app.listen(env.PORT,()=>console.log(`API listening on ${env.PORT}`));
-for (const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>server.close(async()=>{await prisma.$disconnect();process.exit(0);}));
+const app = require('./app');
+const env = require('./config/env');
+const { pool } = require('./config/db');
+
+const server = app.listen(env.PORT, () => console.log(`API running on :${env.PORT}`));
+
+const shutdown = () => server.close(async () => { await pool.end(); process.exit(0); });
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
