@@ -13,7 +13,8 @@ exports.errorHandler = (err, _req, res, _next) => {
       errors: err.issues.map((i) => ({ field: i.path.slice(1).join('.'), message: i.message })),
     });
   }
-  if (err.code === '23505') {
+  // Prisma unique-constraint violation (was Postgres '23505' with raw pg)
+  if (err.code === 'P2002') {
     return res.status(409).json({ success: false, code: 'CONFLICT', message: 'Resource already exists' });
   }
   if (err instanceof ApiError) {
