@@ -4,6 +4,7 @@ const ApiError = require('../utils/ApiError');
 
 exports.authenticate = (req, _res, next) => {
   const header = req.headers.authorization || '';
+  console.log('Authorization header:', header); // Debugging line
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return next(new ApiError(401, 'Authentication required', 'NO_TOKEN'));
   try {

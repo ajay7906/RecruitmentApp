@@ -5,17 +5,17 @@ const ok = (res, data, status = 200) => res.status(status).json({ success: true,
 
 // candidate
 exports.getCandidate = asyncHandler(async (req, res) =>
-  ok(res, { profile: await service.getCandidate(req.user.id) }));
+  ok(res, { profile: await service.getCandidateProfile(req.user.id) }));
 
 exports.updateCandidate = asyncHandler(async (req, res) =>
-  ok(res, { profile: await service.updateCandidate(req.user.id, req.body) }));
+  ok(res, { profile: await service.updateCandidateProfile(req.user.id, req.body) }));
 
 // recruiter
 exports.getRecruiter = asyncHandler(async (req, res) =>
   ok(res, { profile: await service.getRecruiter(req.user.id) }));
 
 exports.updateRecruiter = asyncHandler(async (req, res) =>
-  ok(res, { profile: await service.updateRecruiter(req.user.id, req.body) }));
+  ok(res, { profile: await service.updateRecruiterProfile(req.user.id, req.body) }));
 
 // company
 exports.createCompany = asyncHandler(async (req, res) =>

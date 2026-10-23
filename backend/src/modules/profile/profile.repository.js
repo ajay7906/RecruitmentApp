@@ -1,7 +1,7 @@
 const prisma = require('../../config/prisma');
 
 // candidate
-exports.findCandidateById = (userId, db = prisma) => db.candidateProfile.findUnique({where: {userId}});
+exports.findCandidateById = (userId, db = prisma) => db.candidateProfile.findUnique({where: {userId}, include: {user: true}});
 // upsert : creates on first sav, updates afterwards
 exports.upsertCandidate = (userId, data, db = prisma) => db.candidateProfile.upsert({
     where: {userId},
