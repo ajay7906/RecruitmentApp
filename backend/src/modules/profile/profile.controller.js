@@ -12,7 +12,7 @@ exports.updateCandidate = asyncHandler(async (req, res) =>
 
 // recruiter
 exports.getRecruiter = asyncHandler(async (req, res) =>
-  ok(res, { profile: await service.getRecruiter(req.user.id) }));
+  ok(res, { profile: await service.getRecruiterProfile(req.user.id) }));
 
 exports.updateRecruiter = asyncHandler(async (req, res) =>
   ok(res, { profile: await service.updateRecruiterProfile(req.user.id, req.body) }));

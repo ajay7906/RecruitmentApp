@@ -8,8 +8,9 @@ exports.upsertCandidate = (userId, data, db = prisma) => db.candidateProfile.ups
     create: {userId, ...data},
     update: data
 });
-// Recuiter
+// Recruiter
 exports.findRecruiterById = (userId, db = prisma) => db.recruiterProfile.findUnique({where: {userId}, include: {company: true}});
+exports.findRecruiterByUserId = (userId, db = prisma) => db.recruiterProfile.findUnique({where: {userId}, include: {company: true}});
 exports.upsertRecruiter = (userId, data, db = prisma) => db.recruiterProfile.upsert({
     where: {userId},
     create: {userId, ...data},

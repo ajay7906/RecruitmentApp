@@ -19,6 +19,7 @@ export function RegisterPage() {
   });
 
   async function onSubmit(values) {
+    console.log('Call the api here ')
     setSubmitting(true);
     try {
       const response = await authApi.register(values);
@@ -44,7 +45,7 @@ export function RegisterPage() {
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Create your account</h1>
         <p className="mt-2 text-sm text-slate-500">Choose the workspace that matches your role.</p>
         <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
-          <FormField label="Full name" placeholder="Your name" autoComplete="name" error={errors.name?.message} {...register("name")} />
+          <FormField label="Full name" placeholder="Your name" autoComplete="name" error={errors.fullName?.message} {...register("fullName")} />
           <FormField label="Email address" type="email" placeholder="you@example.com" autoComplete="email" error={errors.email?.message} {...register("email")} />
           <FormField label="Password" type="password" placeholder="At least 8 characters" autoComplete="new-password" error={errors.password?.message} {...register("password")} />
           <label className="block text-sm font-medium text-slate-700">I am joining as
