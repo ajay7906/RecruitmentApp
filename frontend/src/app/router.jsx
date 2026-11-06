@@ -5,11 +5,22 @@ import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { HomePage } from "../features/home/pages/HomePage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { RegisterPage } from "../features/auth/pages/RegisterPage";
+import { VerifyEmailPage } from "../features/auth/pages/VerifyEmailPage";
 import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
 import { ProfilePage } from "../features/candidate-profile/pages/ProfilePage";
+import { RecruiterProfilePage } from "../features/recruiter/pages/RecruiterProfilePage";
 import { JobsPage } from "../features/jobs/pages/JobsPage";
 import { ApplicationsPage } from "../features/applications/pages/ApplicationsPage";
 import { NotFoundPage } from "../features/misc/pages/NotFoundPage";
+import { useAuthStore } from "../stores/authStore";
+
+function RoleBasedProfilePage() {
+  const user = useAuthStore((state) => state.user);
+  if (user?.role === "recruiter") {
+    return <RecruiterProfilePage />;
+  }
+  return <ProfilePage />;
+}
 
 export const router = createBrowserRouter([
   {
@@ -18,6 +29,7 @@ export const router = createBrowserRouter([
       { path: "/", element: <HomePage /> },
       { path: "/login", element: <LoginPage /> },
       { path: "/register", element: <RegisterPage /> },
+      { path: "/verify-email", element: <VerifyEmailPage /> },
     ],
   },
   {
@@ -30,7 +42,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
-      { path: "profile", element: <ProfilePage /> },
+      { path: "profile", element: <RoleBasedProfilePage /> },
       { path: "jobs", element: <JobsPage /> },
       { path: "applications", element: <ApplicationsPage /> },
     ],

@@ -11,7 +11,7 @@ import { Button } from "../../../components/ui/Button";
 
 export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
-  const setSession = useAuthStore((state) => state.setSession);
+  const setAuth = useAuthStore((state) => state.setAuth);
   const navigate = useNavigate();
   const location = useLocation();
   const { register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(loginSchema) });
@@ -20,15 +20,12 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const response = await authApi.login(values);
-      // Adapt this parsing to the actual response from your backend.
       const user = response.user || response.data?.user;
-      console.log("Login response:", response); // Debugging line
-      if (!user) throw new Error("Login response did not contain a user. Check authApi.js response parsing.");
-      // setSession(user);
-      if(!response.data?.accessToken) {
-        throw new Error("Login response did not contain an access token. Check authApi.js response parsing.");
-      }
-      useAuthStore.getState().setAuth(user, response.data.accessToken);
+      const accessToken = response.accessToken || response.data?.accessToken;
+      if (!user) throw new Error("Login response did not contain a user.");
+      if (!accessToken) throw new Error("Login response did not contain an access token.");
+
+      setAuth(user, accessToken);
       toast.success("Signed in successfully");
       navigate(location.state?.from?.pathname || "/app/dashboard", { replace: true });
     } catch (error) {

@@ -31,9 +31,9 @@ import { CompanyModal } from "../components/CompanyModal";
 import { useAuthStore } from "../../../stores/authStore";
 
 // ── helpers ──────────────────────────────────────────────────────
-function toFormDefaults(profile = {}) {
+function toFormDefaults(profile = {}, currentUser = null) {
   return {
-    fullName: profile.user?.fullName ?? "",
+    fullName: profile.user?.fullName ?? currentUser?.fullName ?? "",
     phone: profile.phone ?? "",
     designation: profile.designation ?? "",
     linkedinUrl: profile.linkedinUrl ?? "",
@@ -54,6 +54,7 @@ function cleanPayload(values) {
 export function RecruiterProfilePage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
 
   // ── Profile query ──
   const query = useQuery({
@@ -77,20 +78,24 @@ export function RecruiterProfilePage() {
     formState: { errors, isDirty },
   } = useForm({
     resolver: zodResolver(recruiterProfileSchema),
-    defaultValues: toFormDefaults(),
+    defaultValues: toFormDefaults({}, user),
   });
 
   const profile =
     query.data?.data?.profile ?? query.data?.profile ?? query.data ?? {};
 
   useEffect(() => {
-    reset(toFormDefaults(profile));
+    reset(toFormDefaults(profile, user));
   }, [query.data, reset]);
 
   const saveMutation = useMutation({
     mutationFn: (values) => recruiterApi.updateMyProfile(cleanPayload(values)),
     onSuccess: (data) => {
       queryClient.setQueryData(["recruiter", "profile"], data);
+      const updatedUser = data?.data?.profile?.user || data?.profile?.user;
+      if (updatedUser && user) {
+        setUser({ ...user, fullName: updatedUser.fullName });
+      }
       toast.success("Profile saved!");
     },
     onError: (err) =>
@@ -369,12 +374,6 @@ export function RecruiterProfilePage() {
         open={companyModal.open}
         company={companyModal.company}
         onClose={() => setCompanyModal({ open: false, company: null })}
-        onSuccess={(saved) => {
-          // If creating a new company, auto-link it
-          if (!companyModal.company && saved?.id) {
-            linkMutation.mutate(saved.id);
-          }
-        }}
       />
     </div>
   );

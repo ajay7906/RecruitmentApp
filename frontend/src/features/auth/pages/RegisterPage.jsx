@@ -11,7 +11,7 @@ import { Button } from "../../../components/ui/Button";
 
 export function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
-  const setSession = useAuthStore((state) => state.setSession);
+  const setAuth = useAuthStore((state) => state.setAuth);
   const navigate = useNavigate();
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(registerSchema),
@@ -19,16 +19,21 @@ export function RegisterPage() {
   });
 
   async function onSubmit(values) {
-    console.log('Call the api here ')
     setSubmitting(true);
     try {
       const response = await authApi.register(values);
       const user = response.user || response.data?.user;
-      if (user) {
-        setSession(user);
+      const accessToken = response.accessToken || response.data?.accessToken;
+
+      if (user && accessToken) {
+        setAuth(user, accessToken);
         navigate("/app/dashboard", { replace: true });
       } else {
-        toast.success("Registration complete. Please sign in.");
+        toast.success(
+          response.data?.message ||
+            response.message ||
+            "Registration complete. Check your email to verify your account, then sign in."
+        );
         navigate("/login");
       }
     } catch (error) {
@@ -47,7 +52,7 @@ export function RegisterPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
           <FormField label="Full name" placeholder="Your name" autoComplete="name" error={errors.fullName?.message} {...register("fullName")} />
           <FormField label="Email address" type="email" placeholder="you@example.com" autoComplete="email" error={errors.email?.message} {...register("email")} />
-          <FormField label="Password" type="password" placeholder="At least 8 characters" autoComplete="new-password" error={errors.password?.message} {...register("password")} />
+          <FormField label="Password" type="password" placeholder="At least 8 chars (A-Z, a-z, 0-9)" autoComplete="new-password" error={errors.password?.message} {...register("password")} />
           <label className="block text-sm font-medium text-slate-700">I am joining as
             <select {...register("role")} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none focus:border-brand focus:ring-4 focus:ring-blue-100">
               <option value="candidate">Candidate</option>

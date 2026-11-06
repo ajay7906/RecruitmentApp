@@ -1,21 +1,43 @@
 const prisma = require('../../config/prisma');
 
+const safeUserSelect = {
+    id: true,
+    email: true,
+    fullName: true,
+    role: true,
+};
+
+exports.findUserById = (userId, db = prisma) => db.user.findUnique({
+    where: {id: userId},
+    select: safeUserSelect,
+});
+
 // candidate
-exports.findCandidateById = (userId, db = prisma) => db.candidateProfile.findUnique({where: {userId}, include: {user: true}});
-// upsert : creates on first sav, updates afterwards
+exports.findCandidateById = (userId, db = prisma) => db.candidateProfile.findUnique({
+    where: {userId},
+    include: {user: {select: safeUserSelect}},
+});
+// upsert : creates on first save, updates afterwards
 exports.upsertCandidate = (userId, data, db = prisma) => db.candidateProfile.upsert({
     where: {userId},
     create: {userId, ...data},
-    update: data
+    update: data,
+    include: {user: {select: safeUserSelect}},
 });
 // Recruiter
-exports.findRecruiterById = (userId, db = prisma) => db.recruiterProfile.findUnique({where: {userId}, include: {company: true}});
-exports.findRecruiterByUserId = (userId, db = prisma) => db.recruiterProfile.findUnique({where: {userId}, include: {company: true}});
+exports.findRecruiterById = (userId, db = prisma) => db.recruiterProfile.findUnique({
+    where: {userId},
+    include: {company: true, user: {select: safeUserSelect}},
+});
+exports.findRecruiterByUserId = (userId, db = prisma) => db.recruiterProfile.findUnique({
+    where: {userId},
+    include: {company: true, user: {select: safeUserSelect}},
+});
 exports.upsertRecruiter = (userId, data, db = prisma) => db.recruiterProfile.upsert({
     where: {userId},
     create: {userId, ...data},
     update: data,
-    include: {company: true}
+    include: {company: true, user: {select: safeUserSelect}},
 });
 // update userName
 exports.updateUserName = (userId, fullName, db = prisma) => db.user.update({

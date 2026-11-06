@@ -10,11 +10,13 @@ const cards = [
 
 export function DashboardPage() {
   const user = useAuthStore((state) => state.user);
+  const fullName = user?.fullName || user?.name;
+
   return (
     <div>
       <div className="mb-8">
         <p className="text-sm font-medium text-brand">YOUR WORKSPACE</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : " back"}</h1>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Welcome{fullName ? `, ${fullName.split(" ")[0]}` : " back"}</h1>
         <p className="mt-2 text-slate-500">Here are the next steps in your recruitment journey.</p>
       </div>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">

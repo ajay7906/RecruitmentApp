@@ -26,15 +26,28 @@ exports.updateCandidate = z.object({
   body: z
     .object({
       phone,
-      dateOfBirth: z.coerce.date().max(new Date(), 'Cannot be in the future').nullable().optional(),
-      gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']).nullable().optional(),
+      dateOfBirth: z.preprocess(
+        (v) => (v === '' || v === null || v === undefined ? null : v),
+        z.coerce
+          .date()
+          .refine((d) => d <= new Date(), 'Cannot be in the future')
+          .nullable()
+          .optional()
+      ),
+      gender: z.preprocess(
+        (v) => (v === '' ? null : v),
+        z.enum(['male', 'female', 'other', 'prefer_not_to_say']).nullable().optional()
+      ),
       headline: optionalText(150),
       bio: optionalText(2000),
       location: optionalText(150),
       city: optionalText(100),
       state: optionalText(100),
       country: optionalText(100),
-      yearsOfExperience: z.coerce.number().min(0).max(60).nullable().optional(),
+      yearsOfExperience: z.preprocess(
+        (v) => (v === '' || v === null || v === undefined ? null : v),
+        z.coerce.number().min(0).max(60).nullable().optional()
+      ),
       currentJobTitle: optionalText(100),
       currentCompany: optionalText(100),
       linkedinUrl: optionalUrl,
@@ -51,7 +64,10 @@ exports.updateRecruiter = z.object({
       phone,
       designation: optionalText(100),
       linkedinUrl: optionalUrl,
-      companyId: z.string().uuid().nullable().optional(),
+      companyId: z.preprocess(
+        (v) => (v === '' ? null : v),
+        z.string().uuid().nullable().optional()
+      ),
     })
     .strict(),
 });
@@ -63,7 +79,10 @@ exports.createCompany = z.object({
       website: optionalUrl,
       description: optionalText(2000),
       industry: optionalText(100),
-      companySize: z.enum(['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+']).nullable().optional(),
+      companySize: z.preprocess(
+        (v) => (v === '' ? null : v),
+        z.enum(['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+']).nullable().optional()
+      ),
       location: optionalText(150),
     })
     .strict(),

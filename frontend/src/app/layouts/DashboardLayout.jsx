@@ -14,8 +14,10 @@ const navItems = [
 export function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const user = useAuthStore((state) => state.user);
-  const clearSession = useAuthStore((state) => state.clearSession);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
   const navigate = useNavigate();
+
+  const displayName = user?.fullName || user?.name || "Welcome back";
 
   async function handleLogout() {
     try {
@@ -23,7 +25,7 @@ export function DashboardLayout() {
     } catch {
       // Clear the client session even if the logout endpoint is unavailable.
     } finally {
-      clearSession();
+      clearAuth();
       navigate("/login", { replace: true });
     }
   }
@@ -62,10 +64,10 @@ export function DashboardLayout() {
           <button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setMobileOpen(true)}><Menu size={20} /></button>
           <div className="ml-auto flex items-center gap-3">
             <div className="text-right">
-              <p className="text-sm font-semibold text-slate-800">{user?.name || "Welcome back"}</p>
+              <p className="text-sm font-semibold text-slate-800">{displayName}</p>
               <p className="text-xs capitalize text-slate-500">{user?.role || "Candidate"}</p>
             </div>
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-blue-100 text-sm font-bold text-brand">{(user?.name || "U").slice(0, 1).toUpperCase()}</div>
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-blue-100 text-sm font-bold text-brand">{(user?.fullName || user?.name || "U").slice(0, 1).toUpperCase()}</div>
           </div>
         </header>
         <main className="mx-auto max-w-7xl p-5 lg:p-8"><Outlet /></main>

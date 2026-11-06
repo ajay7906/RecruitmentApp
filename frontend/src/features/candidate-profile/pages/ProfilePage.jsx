@@ -205,7 +205,7 @@ export function ProfilePage() {
                   className={`${profileInputClass} pl-9 appearance-none`}
                   {...register("gender")}
                 >
-                  <option value="">Prefer not to say</option>
+                  <option value="">Select gender</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                   <option value="other">Other</option>

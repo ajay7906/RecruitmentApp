@@ -6,11 +6,12 @@ exports.notFound = (_req, _res, next) => next(new ApiError(404, 'Route not found
 // eslint-disable-next-line no-unused-vars
 exports.errorHandler = (err, _req, res, _next) => {
   if (err instanceof ZodError) {
+    const errors = err.issues.map((i) => ({ field: i.path.slice(1).join('.'), message: i.message }));
     return res.status(422).json({
       success: false,
       code: 'VALIDATION_ERROR',
-      message: 'Invalid input',
-      errors: err.issues.map((i) => ({ field: i.path.slice(1).join('.'), message: i.message })),
+      message: errors[0]?.message ? `${errors[0].field ? `${errors[0].field}: ` : ''}${errors[0].message}` : 'Invalid input',
+      errors,
     });
   }
   // Prisma unique-constraint violation (was Postgres '23505' with raw pg)

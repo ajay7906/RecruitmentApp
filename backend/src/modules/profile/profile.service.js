@@ -7,14 +7,20 @@ const withTransaction = (fn) => prisma.$transaction(fn);
 // Candidate
 exports.getCandidateProfile = async (userId) => {
   const profile = await repo.findCandidateById(userId);
-  // profile can be null because user may have only created an account
-  return profile || {};
+  if (profile) return profile;
+  const user = await repo.findUserById(userId);
+  return { user };
 };
 
 exports.updateCandidateProfile = (userId, data) => repo.upsertCandidate(userId, data);
 
 // Recruiter
-exports.getRecruiterProfile = (userId) => repo.findRecruiterById(userId);
+exports.getRecruiterProfile = async (userId) => {
+  const profile = await repo.findRecruiterById(userId);
+  if (profile) return profile;
+  const user = await repo.findUserById(userId);
+  return { user };
+};
 
 exports.updateRecruiterProfile = async (userId, { fullName, ...profileData }) => {
   if (profileData.companyId) {
