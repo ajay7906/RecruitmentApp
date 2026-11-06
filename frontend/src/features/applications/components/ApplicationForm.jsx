@@ -19,6 +19,15 @@ import {
 } from "../schema/applicationSchemas";
 import { Button } from "../../../components/ui/Button";
 import { profileInputClass } from "../../candidate-profile/components/ProfileField";
+import { PrimaryResumeSelector } from "../../candidate-profile/components/PrimaryResumeSelector";
+
+function normalizeInitialSkills(rawSkills = []) {
+  if (!Array.isArray(rawSkills)) return [];
+  return rawSkills
+    .map((item) => (typeof item === "string" ? item : item?.name || ""))
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 export function ApplicationForm({
   job,
@@ -29,15 +38,26 @@ export function ApplicationForm({
   onCancel,
 }) {
   const fileInputRef = useRef(null);
-  const hasSavedResume = Boolean(candidateProfile?.hasResume);
+  const storedResumes = Array.isArray(candidateProfile?.resumes)
+    ? candidateProfile.resumes
+    : [];
+  const defaultResume =
+    storedResumes.find((r) => r.isPrimary) || storedResumes[0] || null;
+  const hasSavedResume =
+    storedResumes.length > 0 || Boolean(candidateProfile?.hasResume);
 
+  const [selectedResumeId, setSelectedResumeId] = useState(
+    defaultResume?.id || ""
+  );
   const [useProfileResume, setUseProfileResume] = useState(hasSavedResume);
   const [saveResumeToProfile, setSaveResumeToProfile] = useState(true);
   const [resumeUpload, setResumeUpload] = useState(null);
 
   const [coverLetter, setCoverLetter] = useState("");
   const [additionalInformation, setAdditionalInformation] = useState("");
-  const [skills, setSkills] = useState(candidateProfile?.skills || []);
+  const [skills, setSkills] = useState(() =>
+    normalizeInitialSkills(candidateProfile?.skills)
+  );
   const [skillInput, setSkillInput] = useState("");
 
   const questions = Array.isArray(job?.applicationQuestions)
@@ -130,15 +150,17 @@ export function ApplicationForm({
     e.preventDefault();
     if (isSubmitting) return;
 
-    // Validate resume requirement
     const hasValidResume =
-      Boolean(resumeUpload) || (useProfileResume && hasSavedResume);
+      Boolean(resumeUpload) ||
+      Boolean(selectedResumeId) ||
+      (useProfileResume && hasSavedResume);
     if (job.requireResume && !hasValidResume) {
-      toast.error("Please upload your resume or select your saved profile resume.");
+      toast.error(
+        "Please upload your resume or select one of your stored resumes."
+      );
       return;
     }
 
-    // Validate cover letter requirement
     if (job.requireCoverLetter && coverLetter.trim().length < 10) {
       toast.error(
         "A cover letter (at least 10 characters) is required for this job."
@@ -146,7 +168,6 @@ export function ApplicationForm({
       return;
     }
 
-    // Validate screening questions
     const formattedAnswers = [];
     for (const q of questions) {
       const key = q.id || q.question;
@@ -171,6 +192,7 @@ export function ApplicationForm({
 
     onSubmitApplication({
       jobId: job.id,
+      resumeId: !resumeUpload && selectedResumeId ? selectedResumeId : null,
       useProfileResume: Boolean(useProfileResume && !resumeUpload),
       saveResumeToProfile: Boolean(saveResumeToProfile),
       resumeUpload: resumeUpload
@@ -189,7 +211,7 @@ export function ApplicationForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-      {/* 1. Candidate Profile Snapshot (Auto-retrieved from Candidate Profile module) */}
+      {/* 1. Candidate Profile Snapshot */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
@@ -201,8 +223,7 @@ export function ApplicationForm({
                 Your Candidate Profile Summary
               </h2>
               <p className="text-xs text-slate-500">
-                Retrieved automatically from your profile so you don&apos;t have
-                to re-enter it.
+                Retrieved automatically from your structured candidate profile.
               </p>
             </div>
           </div>
@@ -294,25 +315,49 @@ export function ApplicationForm({
         </div>
       </section>
 
-      {/* 2. Resume Section */}
+      {/* 2. Resume Section (Supports multiple stored resumes + new upload) */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-50 text-brand">
-            <FileText size={18} />
-          </span>
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">
-              Resume / CV {job.requireResume && <span className="text-red-500">*</span>}
-            </h2>
-            <p className="text-xs text-slate-500">
-              Accepted formats: PDF, DOC, DOCX (Max 5 MB). Protected with
-              authorized-only access.
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-50 text-brand">
+              <FileText size={18} />
+            </span>
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">
+                Resume / CV{" "}
+                {job.requireResume && <span className="text-red-500">*</span>}
+              </h2>
+              <p className="text-xs text-slate-500">
+                Select one of your stored resumes or upload a role-specific CV
+                (PDF, DOC, DOCX up to 5 MB).
+              </p>
+            </div>
           </div>
+          <Link
+            to="/app/resumes"
+            className="text-xs font-semibold text-brand hover:underline"
+          >
+            Manage Resumes →
+          </Link>
         </div>
 
         <div className="mt-4 space-y-3">
-          {hasSavedResume && (
+          {storedResumes.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-600">
+                Choose from your stored resumes:
+              </p>
+              <PrimaryResumeSelector
+                resumes={storedResumes}
+                selectedResumeId={!resumeUpload ? selectedResumeId : ""}
+                onChange={(id) => {
+                  setSelectedResumeId(id);
+                  setUseProfileResume(true);
+                  setResumeUpload(null);
+                }}
+              />
+            </div>
+          ) : hasSavedResume ? (
             <label
               className={`flex cursor-pointer items-center justify-between rounded-xl border p-4 transition ${
                 useProfileResume && !resumeUpload
@@ -354,7 +399,7 @@ export function ApplicationForm({
                 }
               />
             </label>
-          )}
+          ) : null}
 
           {/* Upload new resume option */}
           <div
@@ -413,7 +458,7 @@ export function ApplicationForm({
                 <div>
                   <p className="text-sm font-semibold text-slate-800">
                     {hasSavedResume
-                      ? "Or upload a tailored resume for this role"
+                      ? "Or upload a new tailored resume for this role"
                       : "Upload your resume"}
                   </p>
                   <p className="text-xs text-slate-500">
@@ -440,15 +485,14 @@ export function ApplicationForm({
                   onChange={(e) => setSaveResumeToProfile(e.target.checked)}
                   className="rounded border-slate-300 text-brand focus:ring-brand"
                 />
-                Save this resume as my default profile resume for future
-                applications
+                Save this resume to my Resume Manager and set as Primary
               </label>
             )}
           </div>
         </div>
       </section>
 
-      {/* 3. Dynamic Screening Questions (if configured on the job) */}
+      {/* 3. Dynamic Screening Questions */}
       {questions.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2.5">

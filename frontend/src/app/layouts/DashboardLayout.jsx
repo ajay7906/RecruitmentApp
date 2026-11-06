@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Search,
   FileText,
+  FileUp,
   LogOut,
   Menu,
 } from "lucide-react";
@@ -19,6 +20,14 @@ function getNavItems(role) {
     { to: "/app/dashboard", label: "Overview", icon: LayoutDashboard },
     { to: "/app/profile", label: "My profile", icon: UserRound },
   ];
+
+  if (!role || role === "candidate") {
+    items.push({
+      to: "/app/resumes",
+      label: "My resumes",
+      icon: FileUp,
+    });
+  }
 
   if (role === "recruiter" || role === "admin") {
     items.push(

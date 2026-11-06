@@ -82,6 +82,16 @@ enum ApplicationStatus {
   @@map("application_status")
 }
 
+enum ResumeProcessingStatus {
+  NOT_PROCESSED
+  PROCESSING
+  TEXT_EXTRACTED
+  FAILED
+  UNSUPPORTED
+
+  @@map("resume_processing_status")
+}
+
 model User {
   id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email           String     @unique // zod already lowercases it; see README note about citext
@@ -106,6 +116,15 @@ model User {
   candidateApplications     Application[]              @relation("CandidateApplications")
   reviewedApplications      Application[]              @relation("RecruiterReviewedApplications")
   applicationStatusChanges  ApplicationStatusHistory[] @relation("ApplicationStatusChangedBy")
+
+  candidateResumes          CandidateResume[]
+  candidateSkills           CandidateSkill[]
+  candidateEducations       CandidateEducation[]
+  candidateExperiences      CandidateExperience[]
+  candidateProjects         CandidateProject[]
+  candidateCertifications   CandidateCertification[]
+  candidateAchievements     CandidateAchievement[]
+  candidateLanguages        CandidateLanguage[]
 
   @@map("users")
 }
@@ -147,37 +166,217 @@ model RefreshToken {
 }
 
 model CandidateProfile {
-  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId            String    @unique @map("user_id") @db.Uuid
-  phone             String?
-  dateOfBirth       DateTime? @map("date_of_birth") @db.Date
-  gender            String?
-  headline          String?
-  bio               String?
-  location          String?
-  city              String?
-  state             String?
-  country           String?
-  yearsOfExperience Decimal?  @map("years_of_experience") @db.Decimal(4, 1)
-  currentJobTitle   String?   @map("current_job_title")
-  currentCompany    String?   @map("current_company")
-  skills            String[]  @default([])
-  resumeKey         String?   @map("resume_key")
-  resumeFileName    String?   @map("resume_file_name")
-  resumeMimeType    String?   @map("resume_mime_type")
-  resumeFileSize    Int?      @map("resume_file_size")
-  resumeUpdatedAt   DateTime? @map("resume_updated_at") @db.Timestamptz(6)
-  linkedinUrl       String?   @map("linkedin_url")
-  githubUrl         String?   @map("github_url")
-  portfolioUrl      String?   @map("portfolio_url")
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                  String    @unique @map("user_id") @db.Uuid
+  profileImageUrl         String?   @map("profile_image_url")
+  phone                   String?
+  dateOfBirth             DateTime? @map("date_of_birth") @db.Date
+  gender                  String?
+  headline                String?
+  bio                     String?
+  careerSummary           String?   @map("career_summary")
+  location                String?
+  city                    String?
+  state                   String?
+  country                 String?
+  pincode                 String?
+  address                 String?
+  yearsOfExperience       Decimal?  @map("years_of_experience") @db.Decimal(4, 1)
+  relevantExperience      Decimal?  @map("relevant_experience") @db.Decimal(4, 1)
+  currentJobTitle         String?   @map("current_job_title")
+  currentCompany          String?   @map("current_company")
+  employmentStatus        String?   @map("employment_status")
+  expectedSalary          Decimal?  @map("expected_salary") @db.Decimal(12, 2)
+  currentSalary           Decimal?  @map("current_salary") @db.Decimal(12, 2)
+  salaryCurrency          String    @default("INR") @map("salary_currency")
+  noticePeriod            String?   @map("notice_period")
+  preferredLocations      String[]  @default([]) @map("preferred_locations")
+  preferredEmploymentType String?   @map("preferred_employment_type")
+  preferredWorkMode       String?   @map("preferred_work_mode")
+  skills                  String[]  @default([])
+  resumeKey               String?   @map("resume_key")
+  resumeFileName          String?   @map("resume_file_name")
+  resumeMimeType          String?   @map("resume_mime_type")
+  resumeFileSize          Int?      @map("resume_file_size")
+  resumeUpdatedAt         DateTime? @map("resume_updated_at") @db.Timestamptz(6)
+  linkedinUrl             String?   @map("linkedin_url")
+  githubUrl               String?   @map("github_url")
+  portfolioUrl            String?   @map("portfolio_url")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([city], map: "idx_candidate_profiles_city")
   @@index([state], map: "idx_candidate_profiles_state")
   @@map("candidate_profiles")
+}
+
+model CandidateResume {
+  id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                 String                 @map("candidate_id") @db.Uuid
+  title                  String?                @map("resume_title")
+  originalFileName       String                 @map("original_file_name")
+  storedFileName         String                 @map("stored_file_name")
+  storageKey             String                 @map("storage_key")
+  fileType               String                 @map("file_type")
+  mimeType               String                 @map("mime_type")
+  fileSize               Int                    @map("file_size")
+  version                Int                    @default(1)
+  rootResumeId           String?                @map("root_resume_id") @db.Uuid
+  previousVersionId      String?                @map("previous_version_id") @db.Uuid
+  isLatestVersion        Boolean                @default(true) @map("is_latest_version")
+  isPrimary              Boolean                @default(false) @map("is_primary")
+  isDeleted              Boolean                @default(false) @map("is_deleted")
+  resumeStatus           ResumeProcessingStatus @default(NOT_PROCESSED) @map("resume_status")
+  extractedTextReference String?                @map("extracted_text_reference")
+  extractedCharCount     Int?                   @map("extracted_char_count")
+  uploadedAt             DateTime               @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  candidate       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  previousVersion CandidateResume?  @relation("ResumeVersionChain", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  nextVersions    CandidateResume[] @relation("ResumeVersionChain")
+  applications    Application[]
+
+  @@index([userId, isDeleted], map: "idx_candidate_resumes_user_deleted")
+  @@index([userId, isPrimary], map: "idx_candidate_resumes_user_primary")
+  @@index([rootResumeId], map: "idx_candidate_resumes_root_id")
+  @@map("candidate_resumes")
+}
+
+model CandidateSkill {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @map("candidate_id") @db.Uuid
+  name             String   @map("skill_name")
+  normalizedName   String   @map("normalized_name")
+  category         String   @default("Technical") @map("skill_category")
+  experienceYears  Decimal? @map("experience_years") @db.Decimal(4, 1)
+  proficiencyLevel String?  @map("proficiency_level")
+  lastUsed         String?  @map("last_used")
+  source           String   @default("MANUAL")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  candidate User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, normalizedName], map: "uq_candidate_skills_user_name")
+  @@index([userId], map: "idx_candidate_skills_user")
+  @@index([normalizedName], map: "idx_candidate_skills_normalized")
+  @@map("candidate_skills")
+}
+
+model CandidateEducation {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @map("candidate_id") @db.Uuid
+  degree            String
+  fieldOfStudy      String    @map("field_of_study")
+  institutionName   String    @map("institution_name")
+  universityName    String?   @map("university_name")
+  educationLevel    String    @map("education_level")
+  startDate         DateTime  @map("start_date") @db.Date
+  endDate           DateTime? @map("end_date") @db.Date
+  currentlyStudying Boolean   @default(false) @map("currently_studying")
+  grade             String?
+  description       String?
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  candidate User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_candidate_education_user")
+  @@map("candidate_education")
+}
+
+model CandidateExperience {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @map("candidate_id") @db.Uuid
+  jobTitle         String    @map("job_title")
+  companyName      String    @map("company_name")
+  employmentType   String    @map("employment_type")
+  workLocation     String?   @map("work_location")
+  startDate        DateTime  @map("start_date") @db.Date
+  endDate          DateTime? @map("end_date") @db.Date
+  currentlyWorking Boolean   @default(false) @map("currently_working")
+  description      String?
+  responsibilities String[]  @default([])
+  skillsUsed       String[]  @default([]) @map("skills_used")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  candidate User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_candidate_experience_user")
+  @@map("candidate_experience")
+}
+
+model CandidateProject {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @map("candidate_id") @db.Uuid
+  name             String    @map("project_name")
+  description      String    @map("project_description")
+  technologiesUsed String[]  @default([]) @map("technologies_used")
+  projectUrl       String?   @map("project_url")
+  githubUrl        String?   @map("github_url")
+  startDate        DateTime? @map("start_date") @db.Date
+  endDate          DateTime? @map("end_date") @db.Date
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  candidate User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_candidate_projects_user")
+  @@map("candidate_projects")
+}
+
+model CandidateCertification {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String    @map("candidate_id") @db.Uuid
+  name                String    @map("certification_name")
+  issuingOrganization String    @map("issuing_organization")
+  issueDate           DateTime  @map("issue_date") @db.Date
+  expirationDate      DateTime? @map("expiration_date") @db.Date
+  credentialId        String?   @map("credential_id")
+  credentialUrl       String?   @map("credential_url")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  candidate User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_candidate_certifications_user")
+  @@map("candidate_certifications")
+}
+
+model CandidateAchievement {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String    @map("candidate_id") @db.Uuid
+  title               String    @map("achievement_title")
+  description         String?
+  date                DateTime? @db.Date
+  issuingOrganization String?   @map("issuing_organization")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  candidate User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_candidate_achievements_user")
+  @@map("candidate_achievements")
+}
+
+model CandidateLanguage {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @map("candidate_id") @db.Uuid
+  name             String   @map("language_name")
+  proficiencyLevel String   @map("proficiency_level")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  candidate User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name], map: "uq_candidate_languages_user_name")
+  @@index([userId], map: "idx_candidate_languages_user")
+  @@map("candidate_languages")
 }
 
 model Company {
@@ -345,6 +544,7 @@ model Application {
   candidateId           String            @map("candidate_id") @db.Uuid
   companyId             String            @map("company_id") @db.Uuid
   reviewedById          String?           @map("reviewed_by") @db.Uuid
+  resumeId              String?           @map("resume_id") @db.Uuid
 
   resumeKey             String?           @map("resume_key")
   resumeFileName        String?           @map("resume_file_name")
@@ -375,6 +575,7 @@ model Application {
   candidate     User                       @relation("CandidateApplications", fields: [candidateId], references: [id], onDelete: Cascade)
   company       Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   reviewedBy    User?                      @relation("RecruiterReviewedApplications", fields: [reviewedById], references: [id], onDelete: SetNull)
+  resume        CandidateResume?           @relation(fields: [resumeId], references: [id], onDelete: SetNull)
   statusHistory ApplicationStatusHistory[]
 
   @@unique([jobId, candidateId], map: "uq_applications_job_candidate")

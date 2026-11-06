@@ -8,12 +8,15 @@ import {
   Phone,
   MapPin,
   BriefcaseBusiness,
-  Calendar,
   Link2,
   FileText,
   HelpCircle,
   SlidersHorizontal,
   UserRound,
+  GraduationCap,
+  FolderGit2,
+  Award,
+  Languages as LanguagesIcon,
 } from "lucide-react";
 
 import { applicationsApi } from "../api/applicationsApi";
@@ -23,6 +26,8 @@ import { ApplicationTimeline } from "../components/ApplicationTimeline";
 import { ResumeViewer } from "../components/ResumeViewer";
 import { StatusUpdateDialog } from "../components/StatusUpdateDialog";
 import { RecruiterNotes } from "../components/RecruiterNotes";
+import { EducationCard } from "../../candidate-profile/components/EducationCard";
+import { ExperienceCard } from "../../candidate-profile/components/ExperienceCard";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { ErrorState } from "../../../components/feedback/ErrorState";
 import { Button } from "../../../components/ui/Button";
@@ -113,7 +118,22 @@ export function RecruiterApplicationReviewPage() {
     null;
   const candidateExperience =
     app.candidateExperience ?? profile.yearsOfExperience ?? null;
-  const skills = app.candidateSkills || profile.skills || [];
+
+  const structuredSkills = Array.isArray(profile.skills) ? profile.skills : [];
+  const skills =
+    app.candidateSkills?.length > 0
+      ? app.candidateSkills
+      : structuredSkills.map((s) => (typeof s === "string" ? s : s.name));
+
+  const educations = Array.isArray(profile.educations) ? profile.educations : [];
+  const experiences = Array.isArray(profile.experiences)
+    ? profile.experiences
+    : [];
+  const projects = Array.isArray(profile.projects) ? profile.projects : [];
+  const certifications = Array.isArray(profile.certifications)
+    ? profile.certifications
+    : [];
+  const languages = Array.isArray(profile.languages) ? profile.languages : [];
 
   const allowedStatuses = app.allowedNextStatuses || [];
   const answers = Array.isArray(app.answers) ? app.answers : [];
@@ -251,11 +271,18 @@ export function RecruiterApplicationReviewPage() {
         <div className="space-y-6 lg:col-span-2">
           {/* Submitted Resume Viewer & Authorized Download */}
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-            <div className="flex items-center gap-2">
-              <FileText size={18} className="text-brand" />
-              <h2 className="text-lg font-semibold text-slate-900">
-                Submitted Resume / CV
-              </h2>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <FileText size={18} className="text-brand" />
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Submitted Resume / CV
+                </h2>
+              </div>
+              {app.resumeRecord?.version ? (
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                  Version v{app.resumeRecord.version}
+                </span>
+              ) : null}
             </div>
 
             <ResumeViewer
@@ -267,6 +294,104 @@ export function RecruiterApplicationReviewPage() {
               asRecruiter
             />
           </section>
+
+          {/* Structured Work Experience History */}
+          {experiences.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2">
+                <BriefcaseBusiness size={18} className="text-emerald-600" />
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Candidate Work Experience ({experiences.length})
+                </h2>
+              </div>
+              <div className="space-y-3">
+                {experiences.map((exp) => (
+                  <ExperienceCard key={exp.id} experience={exp} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Structured Education History */}
+          {educations.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2">
+                <GraduationCap size={18} className="text-indigo-600" />
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Candidate Education ({educations.length})
+                </h2>
+              </div>
+              <div className="space-y-3">
+                {educations.map((edu) => (
+                  <EducationCard key={edu.id} education={edu} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Candidate Projects & Certifications */}
+          {(projects.length > 0 || certifications.length > 0) && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
+              {projects.length > 0 && (
+                <div>
+                  <div className="mb-3 flex items-center gap-2">
+                    <FolderGit2 size={18} className="text-purple-600" />
+                    <h2 className="text-base font-semibold text-slate-900">
+                      Projects ({projects.length})
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {projects.map((proj) => (
+                      <div
+                        key={proj.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5"
+                      >
+                        <h4 className="font-semibold text-sm text-slate-900">
+                          {proj.title}
+                        </h4>
+                        {proj.role && (
+                          <p className="text-xs font-medium text-indigo-600">
+                            {proj.role}
+                          </p>
+                        )}
+                        {proj.description && (
+                          <p className="mt-1.5 text-xs text-slate-600">
+                            {proj.description}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {certifications.length > 0 && (
+                <div className="border-t border-slate-100 pt-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Award size={18} className="text-amber-600" />
+                    <h2 className="text-base font-semibold text-slate-900">
+                      Certifications ({certifications.length})
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    {certifications.map((cert) => (
+                      <div
+                        key={cert.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50/50 p-3"
+                      >
+                        <p className="font-semibold text-xs text-slate-900">
+                          {cert.name}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {cert.issuingOrganization}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Cover Letter */}
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -331,7 +456,6 @@ export function RecruiterApplicationReviewPage() {
 
         {/* Right Sidebar: Candidate Profile Overview & Confidential Recruiter Notes */}
         <div className="space-y-6">
-          {/* Candidate Profile Details */}
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
             <div className="flex items-center gap-2">
               <UserRound size={18} className="text-brand" />
@@ -340,8 +464,10 @@ export function RecruiterApplicationReviewPage() {
               </h2>
             </div>
 
-            {profile.bio && (
-              <p className="text-xs leading-5 text-slate-600">{profile.bio}</p>
+            {(profile.careerSummary || profile.bio) && (
+              <p className="text-xs leading-5 text-slate-600">
+                {profile.careerSummary || profile.bio}
+              </p>
             )}
 
             <div className="space-y-2.5 border-t border-slate-100 pt-3 text-xs">
@@ -365,6 +491,31 @@ export function RecruiterApplicationReviewPage() {
                     : "—"}
                 </span>
               </div>
+              {profile.noticePeriod && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Notice Period:</span>
+                  <span className="font-semibold text-slate-800">
+                    {profile.noticePeriod}
+                  </span>
+                </div>
+              )}
+              {profile.expectedSalary != null && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Expected Salary:</span>
+                  <span className="font-semibold text-slate-800">
+                    {profile.salaryCurrency || "INR"}{" "}
+                    {Number(profile.expectedSalary).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {profile.preferredWorkMode && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Preferred Work Mode:</span>
+                  <span className="font-semibold text-slate-800">
+                    {profile.preferredWorkMode}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-slate-400">Applied Date:</span>
                 <span className="font-semibold text-slate-800">
@@ -374,7 +525,26 @@ export function RecruiterApplicationReviewPage() {
             </div>
 
             {/* Candidate Skills */}
-            {skills.length > 0 && (
+            {structuredSkills.length > 0 ? (
+              <div className="border-t border-slate-100 pt-3">
+                <p className="text-xs font-semibold text-slate-500">
+                  Structured Skills ({structuredSkills.length})
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {structuredSkills.map((sk) => (
+                    <span
+                      key={sk.id || sk.name}
+                      className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand"
+                    >
+                      {sk.name}
+                      {sk.experienceYears != null
+                        ? ` (${sk.experienceYears}y)`
+                        : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : skills.length > 0 ? (
               <div className="border-t border-slate-100 pt-3">
                 <p className="text-xs font-semibold text-slate-500">
                   Skills & Technologies
@@ -386,6 +556,25 @@ export function RecruiterApplicationReviewPage() {
                       className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand"
                     >
                       {sk}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Languages */}
+            {languages.length > 0 && (
+              <div className="border-t border-slate-100 pt-3">
+                <p className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                  <LanguagesIcon size={13} /> Languages
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {languages.map((lang) => (
+                    <span
+                      key={lang.id || lang.language}
+                      className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                    >
+                      {lang.language} ({lang.proficiency})
                     </span>
                   ))}
                 </div>

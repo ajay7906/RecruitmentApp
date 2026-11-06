@@ -31,6 +31,7 @@ const optionalText = (max) =>
 
 const resumeUploadSchema = z
   .object({
+    title: optionalText(120),
     fileName: z.string().trim().min(1, 'Resume file name is required').max(255),
     mimeType: z.string().trim().max(120).optional(),
     contentBase64: z.string().min(10, 'Resume file content is required'),
@@ -56,6 +57,11 @@ exports.submitApplication = z.object({
   body: z
     .object({
       jobId: z.string().uuid('Valid job ID is required'),
+      resumeId: z
+        .preprocess(
+          (v) => (v === '' || v === null ? undefined : v),
+          z.string().uuid('Invalid resume ID').optional()
+        ),
       useProfileResume: z.boolean().optional().default(false),
       saveResumeToProfile: z.boolean().optional().default(true),
       resumeUpload: resumeUploadSchema.nullable().optional(),

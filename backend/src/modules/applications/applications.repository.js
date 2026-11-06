@@ -61,6 +61,18 @@ const candidateApplicationInclude = {
   company: {
     select: publicCompanySelect,
   },
+  resume: {
+    select: {
+      id: true,
+      title: true,
+      originalFileName: true,
+      fileType: true,
+      fileSize: true,
+      version: true,
+      isPrimary: true,
+      uploadedAt: true,
+    },
+  },
   statusHistory: {
     orderBy: { changedAt: 'asc' },
     select: {
@@ -92,6 +104,18 @@ const recruiterApplicationInclude = {
       },
     },
   },
+  resume: {
+    select: {
+      id: true,
+      title: true,
+      originalFileName: true,
+      fileType: true,
+      fileSize: true,
+      version: true,
+      isPrimary: true,
+      uploadedAt: true,
+    },
+  },
   candidate: {
     select: {
       id: true,
@@ -99,19 +123,30 @@ const recruiterApplicationInclude = {
       fullName: true,
       role: true,
       createdAt: true,
+      // Explicitly select non-private CandidateProfile fields (excludes currentSalary and storage keys)
       candidateProfile: {
         select: {
           id: true,
+          profileImageUrl: true,
           phone: true,
           headline: true,
           bio: true,
+          careerSummary: true,
           location: true,
           city: true,
           state: true,
           country: true,
           yearsOfExperience: true,
+          relevantExperience: true,
           currentJobTitle: true,
           currentCompany: true,
+          employmentStatus: true,
+          expectedSalary: true,
+          salaryCurrency: true,
+          noticePeriod: true,
+          preferredLocations: true,
+          preferredEmploymentType: true,
+          preferredWorkMode: true,
           skills: true,
           linkedinUrl: true,
           githubUrl: true,
@@ -119,6 +154,27 @@ const recruiterApplicationInclude = {
           resumeFileName: true,
           resumeUpdatedAt: true,
         },
+      },
+      candidateSkills: {
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      },
+      candidateEducations: {
+        orderBy: [{ currentlyStudying: 'desc' }, { startDate: 'desc' }],
+      },
+      candidateExperiences: {
+        orderBy: [{ currentlyWorking: 'desc' }, { startDate: 'desc' }],
+      },
+      candidateProjects: {
+        orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
+      },
+      candidateCertifications: {
+        orderBy: [{ issueDate: 'desc' }],
+      },
+      candidateAchievements: {
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+      },
+      candidateLanguages: {
+        orderBy: [{ name: 'asc' }],
       },
     },
   },
@@ -163,6 +219,11 @@ exports.findCandidateWithProfile = (userId, db = prisma) =>
       role: true,
       status: true,
       candidateProfile: true,
+      candidateResumes: {
+        where: { isDeleted: false },
+        orderBy: [{ isPrimary: 'desc' }, { uploadedAt: 'desc' }],
+      },
+      candidateSkills: true,
     },
   });
 
@@ -185,10 +246,35 @@ exports.findExistingApplication = (jobId, candidateId, db = prisma) =>
   });
 
 exports.createApplicationWithInitialHistory = async (
-  { applicationData, historyData, profileUpdate },
+  { applicationData, historyData, profileUpdate, newCandidateResumeData },
   db = prisma
 ) =>
   db.$transaction(async (tx) => {
+    let createdResumeId = applicationData.resumeId || null;
+
+    if (newCandidateResumeData && applicationData.candidateId) {
+      if (newCandidateResumeData.isPrimary) {
+        await tx.candidateResume.updateMany({
+          where: { userId: applicationData.candidateId, isPrimary: true },
+          data: { isPrimary: false },
+        });
+      }
+
+      const createdResume = await tx.candidateResume.create({
+        data: {
+          ...newCandidateResumeData,
+          userId: applicationData.candidateId,
+        },
+      });
+
+      await tx.candidateResume.update({
+        where: { id: createdResume.id },
+        data: { rootResumeId: createdResume.id },
+      });
+
+      createdResumeId = createdResume.id;
+    }
+
     if (profileUpdate && applicationData.candidateId) {
       await tx.candidateProfile.upsert({
         where: { userId: applicationData.candidateId },
@@ -201,7 +287,10 @@ exports.createApplicationWithInitialHistory = async (
     }
 
     const created = await tx.application.create({
-      data: applicationData,
+      data: {
+        ...applicationData,
+        resumeId: createdResumeId,
+      },
     });
 
     await tx.applicationStatusHistory.create({

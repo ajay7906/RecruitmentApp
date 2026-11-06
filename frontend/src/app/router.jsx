@@ -8,6 +8,7 @@ import { RegisterPage } from "../features/auth/pages/RegisterPage";
 import { VerifyEmailPage } from "../features/auth/pages/VerifyEmailPage";
 import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
 import { ProfilePage } from "../features/candidate-profile/pages/ProfilePage";
+import { CandidateResumesPage } from "../features/candidate-profile/pages/CandidateResumesPage";
 import { RecruiterProfilePage } from "../features/recruiter/pages/RecruiterProfilePage";
 import { MyCompaniesPage } from "../features/companies/pages/MyCompaniesPage";
 import { CompanyRegistrationPage } from "../features/companies/pages/CompanyRegistrationPage";
@@ -64,6 +65,14 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
       { path: "profile", element: <RoleBasedProfilePage /> },
+      {
+        path: "resumes",
+        element: (
+          <ProtectedRoute allowedRoles={["candidate"]}>
+            <CandidateResumesPage />
+          </ProtectedRoute>
+        ),
+      },
       {
         path: "companies",
         element: (

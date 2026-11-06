@@ -150,6 +150,8 @@ function formatCandidateApplication(app) {
     jobId: app.jobId,
     candidateId: app.candidateId,
     companyId: app.companyId,
+    resumeId: app.resumeId || null,
+    resume: app.resume || null,
     hasResume: Boolean(app.resumeKey),
     resumeFileName: app.resumeFileName,
     resumeMimeType: app.resumeMimeType,
@@ -176,7 +178,7 @@ function formatCandidateApplication(app) {
   };
 }
 
-// Format application for recruiter/admin view (includes candidate profile, internal notes, allowed transitions)
+// Format application for recruiter/admin view (includes structured candidate data, internal notes, allowed transitions)
 function formatRecruiterApplication(app, currentUser, roleMap = null) {
   if (!app) return null;
   const myCompanyRole = assertRecruiterCanAccessApplication(app, currentUser, roleMap);
@@ -186,9 +188,16 @@ function formatRecruiterApplication(app, currentUser, roleMap = null) {
   const appExp = toNumberOrNull(app.candidateExperience);
   const candidateExperience = appExp !== null ? appExp : profileExp;
 
+  const structuredSkills = (app.candidate?.candidateSkills || []).map((s) => ({
+    ...s,
+    experienceYears: toNumberOrNull(s.experienceYears),
+  }));
+
   const candidateSkills =
     app.candidateSkills?.length > 0
       ? app.candidateSkills
+      : structuredSkills.length > 0
+      ? structuredSkills.map((s) => s.name)
       : app.candidate?.candidateProfile?.skills || [];
 
   return {
@@ -199,6 +208,8 @@ function formatRecruiterApplication(app, currentUser, roleMap = null) {
     companyId: app.companyId,
     reviewedById: app.reviewedById,
     reviewedBy: app.reviewedBy || null,
+    resumeId: app.resumeId || null,
+    resume: app.resume || null,
     hasResume: Boolean(app.resumeKey),
     resumeFileName: app.resumeFileName,
     resumeMimeType: app.resumeMimeType,
@@ -253,8 +264,21 @@ function formatRecruiterApplication(app, currentUser, roleMap = null) {
             ? {
                 ...app.candidate.candidateProfile,
                 yearsOfExperience: profileExp,
+                relevantExperience: toNumberOrNull(
+                  app.candidate.candidateProfile.relevantExperience
+                ),
+                expectedSalary: toNumberOrNull(
+                  app.candidate.candidateProfile.expectedSalary
+                ),
               }
             : null,
+          skills: structuredSkills,
+          education: app.candidate.candidateEducations || [],
+          experience: app.candidate.candidateExperiences || [],
+          projects: app.candidate.candidateProjects || [],
+          certifications: app.candidate.candidateCertifications || [],
+          achievements: app.candidate.candidateAchievements || [],
+          languages: app.candidate.candidateLanguages || [],
         }
       : null,
     statusHistory: app.statusHistory || [],
@@ -351,25 +375,84 @@ exports.submitApplication = async (currentUser, payload) => {
     payload.answers
   );
 
-  // Resolve Resume (new upload OR existing profile resume)
+  // Resolve Resume:
+  // 1) Newly uploaded resume file (`payload.resumeUpload`)
+  // 2) Specific selected `CandidateResume` (`payload.resumeId`)
+  // 3) Candidate's primary `CandidateResume` or saved `CandidateProfile.resumeKey`
   const profile = candidateUser.candidateProfile;
+  const candidateResumes = candidateUser.candidateResumes || [];
   let resumeMeta = {
+    resumeId: null,
     resumeKey: null,
     resumeFileName: null,
     resumeMimeType: null,
     resumeFileSize: null,
   };
+  let newCandidateResumeData = null;
 
   if (payload.resumeUpload) {
-    resumeMeta = await resumeStorage.saveResumeFile({
+    const stored = await resumeStorage.saveResumeFile({
       userId: currentUser.id,
       fileName: payload.resumeUpload.fileName,
       mimeType: payload.resumeUpload.mimeType,
       contentBase64: payload.resumeUpload.contentBase64,
     });
-  } else if (payload.useProfileResume || profile?.resumeKey) {
-    if (profile?.resumeKey) {
+    resumeMeta = {
+      resumeId: null,
+      resumeKey: stored.resumeKey,
+      resumeFileName: stored.resumeFileName,
+      resumeMimeType: stored.resumeMimeType,
+      resumeFileSize: stored.resumeFileSize,
+    };
+
+    if (payload.saveResumeToProfile !== false) {
+      const shouldBePrimary = candidateResumes.length === 0;
+      newCandidateResumeData = {
+        title: payload.resumeUpload.title || stored.originalFileName,
+        originalFileName: stored.originalFileName,
+        storedFileName: stored.storedFileName,
+        storageKey: stored.storageKey,
+        fileType: stored.fileType,
+        mimeType: stored.mimeType,
+        fileSize: stored.fileSize,
+        version: 1,
+        isLatestVersion: true,
+        isPrimary: shouldBePrimary,
+        resumeStatus: stored.resumeStatus,
+        extractedTextReference: stored.extractedTextReference,
+        extractedCharCount: stored.extractedCharCount,
+      };
+    }
+  } else if (payload.resumeId) {
+    const matchedResume = candidateResumes.find((r) => r.id === payload.resumeId);
+    if (!matchedResume) {
+      throw new ApiError(
+        404,
+        'Selected resume was not found in your account',
+        'RESUME_NOT_FOUND'
+      );
+    }
+    resumeMeta = {
+      resumeId: matchedResume.id,
+      resumeKey: matchedResume.storageKey,
+      resumeFileName: matchedResume.originalFileName,
+      resumeMimeType: matchedResume.mimeType,
+      resumeFileSize: matchedResume.fileSize,
+    };
+  } else if (payload.useProfileResume || candidateResumes.length > 0 || profile?.resumeKey) {
+    const primaryOrFirst =
+      candidateResumes.find((r) => r.isPrimary) || candidateResumes[0];
+    if (primaryOrFirst) {
       resumeMeta = {
+        resumeId: primaryOrFirst.id,
+        resumeKey: primaryOrFirst.storageKey,
+        resumeFileName: primaryOrFirst.originalFileName,
+        resumeMimeType: primaryOrFirst.mimeType,
+        resumeFileSize: primaryOrFirst.fileSize,
+      };
+    } else if (profile?.resumeKey) {
+      resumeMeta = {
+        resumeId: null,
         resumeKey: profile.resumeKey,
         resumeFileName: profile.resumeFileName || 'resume.pdf',
         resumeMimeType: profile.resumeMimeType || 'application/pdf',
@@ -381,17 +464,25 @@ exports.submitApplication = async (currentUser, payload) => {
   if (job.requireResume && !resumeMeta.resumeKey) {
     throw new ApiError(
       400,
-      'A resume is required to apply for this job. Please upload a PDF, DOC, or DOCX resume.',
+      'A resume is required to apply for this job. Please select an uploaded resume or upload a PDF, DOC, or DOCX file.',
       'RESUME_REQUIRED'
     );
   }
 
-  // Merge skills from payload or candidate profile
+  // Merge skills from payload, structured CandidateSkill records, and CandidateProfile
+  const structuredSkillNames = (candidateUser.candidateSkills || []).map(
+    (s) => s.name
+  );
   const mergedSkills = Array.from(
-    new Set([
-      ...(payload.candidateSkills || []),
-      ...(profile?.skills || []),
-    ].map((s) => String(s).trim()).filter(Boolean))
+    new Set(
+      [
+        ...(payload.candidateSkills || []),
+        ...structuredSkillNames,
+        ...(profile?.skills || []),
+      ]
+        .map((s) => String(s).trim())
+        .filter(Boolean)
+    )
   );
 
   const candidateExperience =
@@ -402,6 +493,7 @@ exports.submitApplication = async (currentUser, payload) => {
     email: candidateUser.email,
     phone: profile?.phone || null,
     headline: profile?.headline || null,
+    careerSummary: profile?.careerSummary || profile?.bio || null,
     currentJobTitle: profile?.currentJobTitle || null,
     currentCompany: profile?.currentCompany || null,
     yearsOfExperience: candidateExperience,
@@ -430,7 +522,11 @@ exports.submitApplication = async (currentUser, payload) => {
   };
 
   const profileUpdate = {};
-  if (payload.resumeUpload && payload.saveResumeToProfile !== false) {
+  if (
+    payload.resumeUpload &&
+    payload.saveResumeToProfile !== false &&
+    (!profile?.resumeKey || candidateResumes.length === 0)
+  ) {
     profileUpdate.resumeKey = resumeMeta.resumeKey;
     profileUpdate.resumeFileName = resumeMeta.resumeFileName;
     profileUpdate.resumeMimeType = resumeMeta.resumeMimeType;
@@ -447,6 +543,7 @@ exports.submitApplication = async (currentUser, payload) => {
         jobId: job.id,
         candidateId: currentUser.id,
         companyId: job.companyId,
+        resumeId: resumeMeta.resumeId,
         resumeKey: resumeMeta.resumeKey,
         resumeFileName: resumeMeta.resumeFileName,
         resumeMimeType: resumeMeta.resumeMimeType,
@@ -470,6 +567,7 @@ exports.submitApplication = async (currentUser, payload) => {
         reason: 'Application submitted by candidate',
       },
       profileUpdate: Object.keys(profileUpdate).length > 0 ? profileUpdate : null,
+      newCandidateResumeData,
     });
 
     return formatCandidateApplication(created);
@@ -780,7 +878,6 @@ exports.updateApplicationStatus = async (
     updateData.rejectionReason = reason || null;
   }
 
-  // If the recruiter also provided an internal note during the status update, append it to recruiterNotes
   if (notes) {
     const existingNotes = Array.isArray(app.recruiterNotes) ? app.recruiterNotes : [];
     updateData.recruiterNotes = [
