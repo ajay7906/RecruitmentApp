@@ -64,11 +64,18 @@ function getNavItems(role) {
   }
 
   if (role === "admin") {
-    items.push({
-      to: "/app/admin/companies",
-      label: "Company approvals",
-      icon: ShieldCheck,
-    });
+    items.push(
+      {
+        to: "/app/admin/companies",
+        label: "Company approvals",
+        icon: ShieldCheck,
+      },
+      {
+        to: "/app/admin/jobs",
+        label: "Job moderation",
+        icon: ShieldCheck,
+      }
+    );
   }
 
   items.push(

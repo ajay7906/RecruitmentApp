@@ -34,13 +34,21 @@ export const questionTypeOptions = [
 
 export const jobStatusOptions = [
   "DRAFT",
-  "PENDING_APPROVAL",
   "PUBLISHED",
   "PAUSED",
   "CLOSED",
   "REJECTED",
   "EXPIRED",
   "ARCHIVED",
+  "UNDER_REVIEW",
+];
+
+export const jobModerationStatusOptions = [
+  "NOT_REVIEWED",
+  "FLAGGED",
+  "UNDER_REVIEW",
+  "ACTION_REQUIRED",
+  "CLEARED",
 ];
 
 const applicationQuestionSchema = z.object({

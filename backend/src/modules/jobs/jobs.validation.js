@@ -13,6 +13,29 @@ const JOB_STATUSES = [
   'REJECTED',
   'EXPIRED',
   'ARCHIVED',
+  'UNDER_REVIEW',
+];
+const JOB_MODERATION_STATUSES = [
+  'NOT_REVIEWED',
+  'FLAGGED',
+  'UNDER_REVIEW',
+  'ACTION_REQUIRED',
+  'CLEARED',
+];
+const JOB_REPORT_CATEGORIES = [
+  'DUPLICATE',
+  'MISLEADING',
+  'SCAM_OR_FRAUD',
+  'OFFENSIVE_CONTENT',
+  'SUSPICIOUS_COMPANY',
+  'OTHER',
+];
+const ADMIN_MODERATION_ACTIONS = [
+  'CLEAR_FLAGS',
+  'PLACE_UNDER_REVIEW',
+  'RESTRICT_JOB',
+  'REJECT_JOB',
+  'RESTORE_JOB',
 ];
 
 const emptyToNull = (val) => (typeof val === 'string' && val.trim() === '' ? null : val);
@@ -134,6 +157,7 @@ const baseJobFields = {
   maxApplications: optionalInt(1, 1_000_000),
   applicationQuestions: z.array(applicationQuestionSchema).max(25).optional(),
   requireAdminApproval: z.boolean().optional(),
+  saveAsDraft: z.boolean().optional(),
 };
 
 function normalizeJobPayload(data) {
@@ -309,19 +333,56 @@ exports.rejectJob = z.object({
     .strict(),
 });
 
+exports.reportJob = z.object({
+  params: z.object({ id: z.string().uuid('Invalid job ID') }),
+  body: z
+    .object({
+      category: z.enum(JOB_REPORT_CATEGORIES, {
+        errorMap: () => ({ message: 'Please select a valid report category' }),
+      }),
+      details: optionalText(1500),
+    })
+    .strict(),
+});
+
+exports.moderateJob = z.object({
+  params: z.object({ id: z.string().uuid('Invalid job ID') }),
+  body: z
+    .object({
+      action: z.enum(ADMIN_MODERATION_ACTIONS),
+      reason: z
+        .string()
+        .trim()
+        .min(5, 'Please provide a moderation reason (at least 5 characters)')
+        .max(1500),
+    })
+    .strict(),
+});
+
 exports.listRecruiterJobs = z.object({
   query: z.object({
     q: z.string().trim().optional().default(''),
     search: z.string().trim().optional(),
     companyId: z.preprocess((v) => (v === '' || v === 'ALL' ? undefined : v), z.string().uuid().optional()),
     status: z.preprocess((v) => (v === '' || v === 'ALL' ? undefined : v), z.enum(JOB_STATUSES).optional()),
+    moderationStatus: z.preprocess(
+      (v) => (v === '' || v === 'ALL' ? undefined : v),
+      z.enum(JOB_MODERATION_STATUSES).optional()
+    ),
+    flaggedOnly: z.preprocess(
+      (v) => v === 'true' || v === true,
+      z.boolean().optional().default(false)
+    ),
     employmentType: z.preprocess(
       (v) => (v === '' || v === 'ALL' ? undefined : v),
       z.enum(EMPLOYMENT_TYPES).optional()
     ),
     workMode: z.preprocess((v) => (v === '' || v === 'ALL' ? undefined : v), z.enum(WORK_MODES).optional()),
     location: z.string().trim().optional(),
-    sortBy: z.enum(['createdAt', 'publishedAt', 'title', 'applicationDeadline']).optional().default('createdAt'),
+    sortBy: z
+      .enum(['createdAt', 'publishedAt', 'title', 'applicationDeadline', 'moderationScore', 'reportCount'])
+      .optional()
+      .default('createdAt'),
     sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -359,3 +420,6 @@ exports.WORK_MODES = WORK_MODES;
 exports.SALARY_PERIODS = SALARY_PERIODS;
 exports.QUESTION_TYPES = QUESTION_TYPES;
 exports.JOB_STATUSES = JOB_STATUSES;
+exports.JOB_MODERATION_STATUSES = JOB_MODERATION_STATUSES;
+exports.JOB_REPORT_CATEGORIES = JOB_REPORT_CATEGORIES;
+exports.ADMIN_MODERATION_ACTIONS = ADMIN_MODERATION_ACTIONS;

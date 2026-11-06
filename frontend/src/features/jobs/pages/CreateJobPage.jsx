@@ -35,28 +35,25 @@ export function CreateJobPage() {
 
   const createMutation = useMutation({
     mutationFn: async ({ payload, shouldPublish }) => {
-      const createdRes = await jobsApi.createJob(payload);
+      const createdRes = await jobsApi.createJob({
+        ...payload,
+        saveAsDraft: !shouldPublish,
+      });
       const job = createdRes?.data?.job ?? createdRes?.job;
-
-      if (shouldPublish && job?.id) {
-        const company = companies.find((c) => c.id === payload.companyId);
-        const submitForApproval =
-          company?.status !== "APPROVED" || Boolean(payload.requireAdminApproval);
-        const pubRes = await jobsApi.publishJob(job.id, { submitForApproval });
-        return {
-          job: pubRes?.data?.job ?? pubRes?.job ?? job,
-          published: true,
-          message: pubRes?.data?.message || "Job published!",
-        };
-      }
-      return { job, published: false };
+      return {
+        job,
+        published: job?.status === "PUBLISHED",
+        message:
+          createdRes?.data?.message ||
+          (job?.status === "PUBLISHED"
+            ? "Job vacancy published automatically!"
+            : "Job vacancy saved as draft!"),
+      };
     },
-    onSuccess: ({ job, published, message }) => {
+    onSuccess: ({ job, message }) => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
-      toast.success(
-        published ? message : "Job vacancy saved as draft!"
-      );
+      toast.success(message);
       if (job?.id) {
         navigate(`/app/jobs/${job.id}/manage`, { replace: true });
       } else {
@@ -131,7 +128,8 @@ export function CreateJobPage() {
         </h1>
         <p className="mt-2 text-slate-500">
           Define role requirements, responsibilities, compensation, and
-          application settings. Jobs start in DRAFT status until published.
+          application settings. Jobs for approved companies are validated and
+          published automatically without waiting for manual admin approval.
         </p>
       </div>
 

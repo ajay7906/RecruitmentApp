@@ -49,11 +49,9 @@ export const jobsApi = {
     return data;
   },
 
-  // ── Lifecycle Transitions ────────────────────────────────────────
-  async publishJob(id, { submitForApproval = false } = {}) {
-    const { data } = await apiClient.post(`/jobs/${id}/publish`, {
-      submitForApproval,
-    });
+  // ── Lifecycle Transitions (Automatic Publishing) ─────────────────
+  async publishJob(id) {
+    const { data } = await apiClient.post(`/jobs/${id}/publish`, {});
     return data;
   },
 
@@ -77,14 +75,36 @@ export const jobsApi = {
     return data;
   },
 
-  // ── Admin Approval Transitions ───────────────────────────────────
-  async approveJob(id) {
-    const { data } = await apiClient.post(`/jobs/${id}/approve`);
+  // ── Candidate / User Job Reporting ───────────────────────────────
+  async reportJob(id, payload) {
+    const { data } = await apiClient.post(`/jobs/${id}/report`, payload);
+    return data;
+  },
+
+  // ── Admin Moderation & Audit Logs ────────────────────────────────
+  async getJobModeration(id) {
+    const { data } = await apiClient.get(`/jobs/${id}/moderation`);
+    return data;
+  },
+
+  async moderateJob(id, payload) {
+    const { data } = await apiClient.post(`/jobs/${id}/moderation`, payload);
+    return data;
+  },
+
+  async approveJob(id, reason = "Cleared and restored by administrator") {
+    const { data } = await apiClient.post(`/jobs/${id}/moderation`, {
+      action: "RESTORE_JOB",
+      reason,
+    });
     return data;
   },
 
   async rejectJob(id, reason) {
-    const { data } = await apiClient.post(`/jobs/${id}/reject`, { reason });
+    const { data } = await apiClient.post(`/jobs/${id}/moderation`, {
+      action: "REJECT_JOB",
+      reason,
+    });
     return data;
   },
 };

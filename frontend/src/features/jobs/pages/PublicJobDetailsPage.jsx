@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -13,6 +14,7 @@ import {
   Send,
   FileCheck2,
   Eye,
+  Flag,
 } from "lucide-react";
 
 import { jobsApi } from "../api/jobsApi";
@@ -32,6 +34,30 @@ export function PublicJobDetailsPage() {
   const user = useAuthStore((s) => s.user);
   const isPublicRoute = !locationObj.pathname.startsWith("/app");
   const backPath = isPublicRoute ? "/jobs" : "/app/jobs";
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportCategory, setReportCategory] = useState("MISLEADING");
+  const [reportDetails, setReportDetails] = useState("");
+
+  const reportMutation = useMutation({
+    mutationFn: () =>
+      jobsApi.reportJob(id, {
+        category: reportCategory,
+        details: reportDetails.trim() || null,
+      }),
+    onSuccess: (res) => {
+      toast.success(
+        res?.data?.message ||
+          "Thank you. Your report has been submitted for moderation review."
+      );
+      setReportOpen(false);
+      setReportDetails("");
+    },
+    onError: (err) => {
+      toast.error(
+        err?.response?.data?.message || "Could not submit job report."
+      );
+    },
+  });
 
   const query = useQuery({
     queryKey: ["jobs", "public-detail", id],
@@ -408,9 +434,93 @@ export function PublicJobDetailsPage() {
                 {job.applicationInstructions}
               </div>
             )}
+
+            {user && (
+              <div className="mt-4 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-red-600"
+                >
+                  <Flag size={13} />
+                  Report suspicious or misleading job listing
+                </button>
+              </div>
+            )}
           </section>
         </div>
       </div>
+
+      {/* Report Job Modal */}
+      {reportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-slate-900">
+              Report Job Listing
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Help keep the platform safe by reporting duplicate, misleading, or
+              fraudulent job postings.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">
+                  Reason Category
+                </label>
+                <select
+                  value={reportCategory}
+                  onChange={(e) => setReportCategory(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-brand focus:outline-none"
+                >
+                  <option value="MISLEADING">Misleading Job Description</option>
+                  <option value="SCAM_OR_FRAUD">
+                    Scam / Requests Money or Fees
+                  </option>
+                  <option value="DUPLICATE">Duplicate Job Posting</option>
+                  <option value="SUSPICIOUS_COMPANY">
+                    Suspicious Company Activity
+                  </option>
+                  <option value="OFFENSIVE_CONTENT">
+                    Offensive or Inappropriate Content
+                  </option>
+                  <option value="OTHER">Other Concern</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">
+                  Additional Details (optional)
+                </label>
+                <textarea
+                  rows={3}
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  placeholder="Describe why this job listing appears suspicious..."
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2.5">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setReportOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={reportMutation.isPending}
+                onClick={() => reportMutation.mutate()}
+              >
+                {reportMutation.isPending ? "Submitting..." : "Submit Report"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

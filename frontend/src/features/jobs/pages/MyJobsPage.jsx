@@ -78,9 +78,7 @@ export function MyJobsPage() {
   const actionMutation = useMutation({
     mutationFn: async ({ action, job }) => {
       if (action === "publish") {
-        const submitForApproval =
-          job.company?.status !== "APPROVED" || Boolean(job.requireAdminApproval);
-        return jobsApi.publishJob(job.id, { submitForApproval });
+        return jobsApi.publishJob(job.id);
       }
       if (action === "pause") return jobsApi.pauseJob(job.id);
       if (action === "resume") return jobsApi.resumeJob(job.id);

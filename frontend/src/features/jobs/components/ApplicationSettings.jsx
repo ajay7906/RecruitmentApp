@@ -105,15 +105,6 @@ export function ApplicationSettings({
           />
           Allow applications after deadline
         </label>
-
-        <label className="inline-flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand"
-            {...register("requireAdminApproval")}
-          />
-          Require admin approval before publishing
-        </label>
       </div>
 
       {/* Additional Screening Questions Builder */}

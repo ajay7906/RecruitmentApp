@@ -80,9 +80,7 @@ export function JobDashboardPage() {
   const actionMutation = useMutation({
     mutationFn: async ({ action, job }) => {
       if (action === "publish") {
-        const submitForApproval =
-          job.company?.status !== "APPROVED" || Boolean(job.requireAdminApproval);
-        return jobsApi.publishJob(job.id, { submitForApproval });
+        return jobsApi.publishJob(job.id);
       }
       if (action === "pause") return jobsApi.pauseJob(job.id);
       if (action === "resume") return jobsApi.resumeJob(job.id);
@@ -147,11 +145,11 @@ export function JobDashboardPage() {
       filterStatus: "DRAFT",
     },
     {
-      label: "Pending Approval",
-      value: stats.pendingApprovalJobs,
+      label: "Under Moderation",
+      value: stats.underReviewJobs ?? stats.flaggedJobs ?? 0,
       icon: Clock,
       color: "bg-amber-50 text-amber-600",
-      filterStatus: "PENDING_APPROVAL",
+      filterStatus: "UNDER_REVIEW",
     },
     {
       label: "Paused Jobs",
@@ -186,17 +184,12 @@ export function JobDashboardPage() {
 
   const dialogConfig = {
     publish: {
-      title: "Publish job vacancy?",
+      title: "Publish job vacancy automatically?",
       description:
-        dialog.job?.company?.status === "APPROVED" &&
-        !dialog.job?.requireAdminApproval
-          ? `"${dialog.job?.title}" will become publicly visible to candidates immediately.`
-          : `"${dialog.job?.title}" will be submitted for approval.`,
-      confirmLabel:
-        dialog.job?.company?.status === "APPROVED" &&
-        !dialog.job?.requireAdminApproval
-          ? "Publish Now"
-          : "Submit for Approval",
+        dialog.job?.company?.status === "APPROVED"
+          ? `"${dialog.job?.title}" will be validated and published immediately without waiting for manual administrator approval.`
+          : `Company "${dialog.job?.company?.name}" must be APPROVED before publishing live job vacancies.`,
+      confirmLabel: "Publish Now",
       variant: "primary",
     },
     close: {

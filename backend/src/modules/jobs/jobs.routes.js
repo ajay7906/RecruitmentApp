@@ -33,14 +33,23 @@ router.put('/:id', requireRole('recruiter', 'admin'), validate(v.updateJob), c.u
 // Delete job (only DRAFT, REJECTED, ARCHIVED)
 router.delete('/:id', requireRole('recruiter', 'admin'), validate(v.jobIdParam), c.deleteJob);
 
-// Lifecycle transitions
+// Lifecycle transitions (Automatic Publishing)
 router.post('/:id/publish', requireRole('recruiter', 'admin'), validate(v.publishJob), c.publishJob);
 router.post('/:id/pause', requireRole('recruiter', 'admin'), validate(v.jobIdParam), c.pauseJob);
 router.post('/:id/resume', requireRole('recruiter', 'admin'), validate(v.jobIdParam), c.resumeJob);
 router.post('/:id/close', requireRole('recruiter', 'admin'), validate(v.jobIdParam), c.closeJob);
 router.post('/:id/archive', requireRole('recruiter', 'admin'), validate(v.jobIdParam), c.archiveJob);
 
-// Admin approval workflow transitions
+// Candidate / User reporting of suspicious listings
+router.post('/:id/report', validate(v.reportJob), c.reportJob);
+
+// Moderation details & audit history
+router.get('/:id/moderation', requireRole('recruiter', 'admin'), validate(v.jobIdParam), c.getJobModerationDetails);
+
+// Admin moderation actions (Clear, Under Review, Restrict, Reject, Restore)
+router.post('/:id/moderation', requireRole('admin'), validate(v.moderateJob), c.moderateJob);
+
+// Backward-compatible Admin restore/reject routes
 router.post('/:id/approve', requireRole('admin'), validate(v.jobIdParam), c.approveJob);
 router.post('/:id/reject', requireRole('admin'), validate(v.rejectJob), c.rejectJob);
 

@@ -508,25 +508,25 @@ export function JobForm({
 
       {/* ── Form Actions ── */}
       <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
-        <Button type="submit" disabled={busy} className="gap-2">
+        <Button
+          type="submit"
+          variant={onSaveAndPublish ? "secondary" : "primary"}
+          disabled={busy}
+          className="gap-2"
+        >
           <Save size={16} />
           {isSaving ? "Saving..." : submitLabel}
         </Button>
 
-        {onSaveAndPublish && (
+        {onSaveAndPublish && selectedCompany?.status === "APPROVED" && (
           <Button
             type="button"
-            variant="secondary"
             disabled={busy}
             onClick={handleSubmit(handlePublish)}
-            className="gap-2 border-brand/30 text-brand hover:bg-blue-50"
+            className="gap-2"
           >
             <Send size={16} />
-            {isPublishing
-              ? "Publishing..."
-              : selectedCompany?.status === "APPROVED"
-              ? "Save & Publish Job"
-              : "Save & Submit for Approval"}
+            {isPublishing ? "Publishing..." : "Publish Job Automatically"}
           </Button>
         )}
       </div>

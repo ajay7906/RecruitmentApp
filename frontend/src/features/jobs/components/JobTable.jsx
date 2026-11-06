@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Building2, MapPin, Users2 } from "lucide-react";
-import { JobStatusBadge } from "./JobStatusBadge";
+import { JobStatusBadge, JobModerationBadge } from "./JobStatusBadge";
 import { JobActionMenu } from "./JobActionMenu";
 import { formatDate } from "../../../utils/formatters";
 
@@ -95,7 +95,16 @@ export function JobTable({ jobs = [], onAction }) {
                   </td>
 
                   <td className="px-4 py-4">
-                    <JobStatusBadge status={job.status} size="sm" />
+                    <div className="flex flex-col items-start gap-1">
+                      <JobStatusBadge status={job.status} size="sm" />
+                      {job.moderationStatus &&
+                        job.moderationStatus !== "NOT_REVIEWED" && (
+                          <JobModerationBadge
+                            moderationStatus={job.moderationStatus}
+                            size="sm"
+                          />
+                        )}
+                    </div>
                   </td>
 
                   <td className="px-4 py-4 text-xs text-slate-600">

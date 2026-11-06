@@ -17,7 +17,11 @@ exports.getPublicJobDetails = asyncHandler(async (req, res) => {
 // Recruiter & Admin endpoints
 exports.createJob = asyncHandler(async (req, res) => {
   const job = await service.createJob(req.user, req.body);
-  ok(res, { job, message: 'Job created in DRAFT status' }, 201);
+  const message =
+    job.status === 'PUBLISHED'
+      ? 'Job vacancy published automatically!'
+      : 'Job saved in DRAFT status';
+  ok(res, { job, message }, 201);
 });
 
 exports.getMyJobs = asyncHandler(async (req, res) => {
@@ -47,11 +51,7 @@ exports.deleteJob = asyncHandler(async (req, res) => {
 
 exports.publishJob = asyncHandler(async (req, res) => {
   const job = await service.publishJob(req.user, req.params.id, req.body);
-  const message =
-    job.status === 'PENDING_APPROVAL'
-      ? 'Job submitted for administrator approval'
-      : 'Job published successfully';
-  ok(res, { job, message });
+  ok(res, { job, message: 'Job published automatically!' });
 });
 
 exports.pauseJob = asyncHandler(async (req, res) => {
@@ -75,11 +75,43 @@ exports.archiveJob = asyncHandler(async (req, res) => {
 });
 
 exports.approveJob = asyncHandler(async (req, res) => {
-  const job = await service.approveJob(req.user, req.params.id);
-  ok(res, { job, message: 'Job approved and published' });
+  const job = await service.approveJob(req.user, req.params.id, req.body?.reason);
+  ok(res, { job, message: 'Job cleared and restored to PUBLISHED' });
 });
 
 exports.rejectJob = asyncHandler(async (req, res) => {
   const job = await service.rejectJob(req.user, req.params.id, req.body.reason);
-  ok(res, { job, message: 'Job publishing request rejected' });
+  ok(res, { job, message: 'Job restricted and marked as REJECTED' });
+});
+
+exports.reportJob = asyncHandler(async (req, res) => {
+  const result = await service.reportJob(req.user, req.params.id, req.body);
+  ok(
+    res,
+    {
+      ...result,
+      message: 'Thank you. Your report has been submitted for moderation review.',
+    },
+    201
+  );
+});
+
+exports.getJobModerationDetails = asyncHandler(async (req, res) => {
+  const result = await service.getJobModerationDetails(req.user, req.params.id);
+  ok(res, result);
+});
+
+exports.moderateJob = asyncHandler(async (req, res) => {
+  const job = await service.moderateJob(req.user, req.params.id, req.body);
+  const actionLabels = {
+    CLEAR_FLAGS: 'Moderation flags cleared',
+    PLACE_UNDER_REVIEW: 'Job placed under moderation review',
+    RESTRICT_JOB: 'Job paused and restricted',
+    REJECT_JOB: 'Job rejected by moderation',
+    RESTORE_JOB: 'Job restored and published',
+  };
+  ok(res, {
+    job,
+    message: actionLabels[req.body.action] || 'Moderation action applied',
+  });
 });

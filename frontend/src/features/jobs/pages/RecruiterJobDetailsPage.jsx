@@ -25,7 +25,10 @@ import {
 
 import { jobsApi } from "../api/jobsApi";
 import { formatSalaryRange, formatExperienceRange } from "../schema/jobSchemas";
-import { JobStatusBadge } from "../components/JobStatusBadge";
+import {
+  JobStatusBadge,
+  JobModerationBadge,
+} from "../components/JobStatusBadge";
 import { CompanyStatusBadge } from "../../companies/components/CompanyStatusBadge";
 import { ConfirmDialog } from "../../companies/components/ConfirmDialog";
 import { LoadingState } from "../../../components/feedback/LoadingState";
@@ -63,9 +66,7 @@ export function RecruiterJobDetailsPage() {
   const lifecycleMutation = useMutation({
     mutationFn: async (action) => {
       if (action === "publish") {
-        const submitForApproval =
-          job.company?.status !== "APPROVED" || Boolean(job.requireAdminApproval);
-        return jobsApi.publishJob(id, { submitForApproval });
+        return jobsApi.publishJob(id);
       }
       if (action === "pause") return jobsApi.pauseJob(id);
       if (action === "resume") return jobsApi.resumeJob(id);
@@ -126,6 +127,9 @@ export function RecruiterJobDetailsPage() {
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold text-slate-950">{job.title}</h1>
             <JobStatusBadge status={job.status} />
+            {job.moderationStatus && (
+              <JobModerationBadge moderationStatus={job.moderationStatus} />
+            )}
           </div>
           <p className="mt-1 text-sm text-slate-500">
             {job.company?.name} · {job.department || job.category || "General"} ·
@@ -170,9 +174,7 @@ export function RecruiterJobDetailsPage() {
               className="gap-1.5 py-2.5 text-xs"
             >
               <Send size={14} />
-              {job.company?.status === "APPROVED" && !job.requireAdminApproval
-                ? "Publish Job"
-                : "Submit for Approval"}
+              Publish Job
             </Button>
           )}
 

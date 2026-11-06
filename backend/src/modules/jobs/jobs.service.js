@@ -1,5 +1,6 @@
 const ApiError = require('../../utils/ApiError');
 const repo = require('./jobs.repository');
+const moderationService = require('./jobModeration.service');
 
 function toNumberOrNull(decimalVal) {
   if (decimalVal === null || decimalVal === undefined) return null;
@@ -60,6 +61,11 @@ function formatRecruiterJob(job, currentUser, roleMap = null) {
     maxExperience,
     minSalary,
     maxSalary,
+    moderationStatus: job.moderationStatus || 'NOT_REVIEWED',
+    moderationFlags: job.moderationFlags || [],
+    moderationScore: job.moderationScore || 0,
+    moderationReason: job.moderationReason || null,
+    reportCount: job.reportCount || 0,
     ...perms,
   };
 }
@@ -228,9 +234,10 @@ function assertCompanyEligibleToPublish(company) {
   }
 }
 
-// ── Create Job (starts in DRAFT) ─────────────────────────────────────────
+// ── Create Job (Automatic Publishing for Approved Companies unless saveAsDraft=true) ──
 exports.createJob = async (currentUser, data) => {
-  const company = await repo.findCompanyWithMemberships(data.companyId);
+  const { saveAsDraft = false, ...jobFields } = data;
+  const company = await repo.findCompanyWithMemberships(jobFields.companyId);
   if (!company) {
     throw new ApiError(404, 'Selected company not found', 'COMPANY_NOT_FOUND');
   }
@@ -244,20 +251,60 @@ exports.createJob = async (currentUser, data) => {
     );
   }
 
-  if (company.status === 'SUSPENDED' && currentUser.role !== 'admin') {
+  if (company.status === 'SUSPENDED') {
     throw new ApiError(
       403,
-      'Cannot create jobs for a suspended company',
+      `Cannot create or publish jobs because "${company.name}" is currently SUSPENDED.`,
       'COMPANY_SUSPENDED'
     );
   }
 
+  const contentHash = moderationService.computeJobContentHash(jobFields);
+
+  // If recruiter explicitly requested saving as a draft, save in DRAFT status
+  if (saveAsDraft) {
+    const draftJob = await repo.createJob({
+      ...jobFields,
+      contentHash,
+      createdById: currentUser.id,
+      updatedById: currentUser.id,
+      status: 'DRAFT',
+      moderationStatus: 'NOT_REVIEWED',
+    });
+
+    return formatRecruiterJob(draftJob, currentUser);
+  }
+
+  // Otherwise, perform automatic publishing validation & checks:
+  // 1. Verify company is APPROVED and ACTIVE
+  assertCompanyEligibleToPublish(company);
+
+  // 2. Validate mandatory job information, salary, experience, location & deadline
+  validateJobReadinessForPublish(jobFields);
+
+  // 3. Perform synchronous duplicate and prohibited content checks
+  const preCheck = await moderationService.runPrePublishChecks({
+    companyId: company.id,
+    payload: jobFields,
+  });
+  if (!preCheck.allowed) {
+    throw new ApiError(400, preCheck.message, preCheck.code);
+  }
+
+  const now = new Date();
   const created = await repo.createJob({
-    ...data,
+    ...jobFields,
+    contentHash: preCheck.contentHash || contentHash,
     createdById: currentUser.id,
     updatedById: currentUser.id,
-    status: 'DRAFT',
+    status: 'PUBLISHED',
+    moderationStatus: 'NOT_REVIEWED',
+    submittedAt: now,
+    publishedAt: now,
   });
+
+  // 4. Trigger non-blocking asynchronous background moderation
+  moderationService.scheduleAsyncModeration(created.id, 'JOB_CREATED_AND_PUBLISHED');
 
   return formatRecruiterJob(created, currentUser);
 };
@@ -354,16 +401,36 @@ exports.updateJob = async (currentUser, jobId, data) => {
     );
   }
 
+  const { saveAsDraft: _ignoreDraft, ...updateFields } = data;
+  const merged = { ...job, ...updateFields };
+  const contentHash = moderationService.computeJobContentHash(merged);
+
   if (job.status === 'PUBLISHED') {
-    // Ensure published job remains valid after edit
-    const merged = { ...job, ...data };
+    // Ensure published job remains valid and passes pre-publish safety checks after edit
+    assertCompanyEligibleToPublish(job.company);
     validateJobReadinessForPublish(merged);
+    const preCheck = await moderationService.runPrePublishChecks({
+      companyId: job.companyId,
+      payload: merged,
+      excludeJobId: job.id,
+    });
+    if (!preCheck.allowed) {
+      throw new ApiError(400, preCheck.message, preCheck.code);
+    }
   }
 
   const updated = await repo.updateJob(jobId, {
-    ...data,
+    ...updateFields,
+    contentHash,
+    ...(job.status === 'PUBLISHED' && job.moderationStatus !== 'ACTION_REQUIRED'
+      ? { moderationStatus: 'NOT_REVIEWED' }
+      : {}),
     updatedById: currentUser.id,
   });
+
+  if (updated.status === 'PUBLISHED') {
+    moderationService.scheduleAsyncModeration(updated.id, 'JOB_UPDATED');
+  }
 
   return formatRecruiterJob(updated, currentUser);
 };
@@ -384,13 +451,23 @@ exports.deleteJob = async (currentUser, jobId) => {
   await repo.deleteJob(jobId);
 };
 
-// ── Publish Job or Submit for Approval ───────────────────────────────────
-exports.publishJob = async (currentUser, jobId, { submitForApproval = false } = {}) => {
+// ── Automatic Job Publishing (No Manual Approval Queue Required) ─────────
+exports.publishJob = async (currentUser, jobId) => {
   const job = await getJobOrThrow(jobId);
   assertCanModifyJob(job, currentUser);
 
   if (job.status === 'PUBLISHED') {
     throw new ApiError(400, 'Job is already published', 'ALREADY_PUBLISHED');
+  }
+  if (
+    job.moderationStatus === 'ACTION_REQUIRED' &&
+    currentUser.role !== 'admin'
+  ) {
+    throw new ApiError(
+      403,
+      'This job has been restricted by platform moderation. Please update the listing or contact an administrator.',
+      'MODERATION_ACTION_REQUIRED'
+    );
   }
   if (!['DRAFT', 'REJECTED', 'PENDING_APPROVAL'].includes(job.status)) {
     throw new ApiError(
@@ -400,33 +477,35 @@ exports.publishJob = async (currentUser, jobId, { submitForApproval = false } = 
     );
   }
 
-  validateJobReadinessForPublish(job);
-
-  const needsApproval = Boolean(submitForApproval || job.requireAdminApproval);
-
-  if (needsApproval && currentUser.role !== 'admin') {
-    if (job.company?.status === 'SUSPENDED') {
-      throw new ApiError(403, 'Cannot submit jobs for a suspended company', 'COMPANY_SUSPENDED');
-    }
-    const submitted = await repo.updateJob(jobId, {
-      status: 'PENDING_APPROVAL',
-      submittedAt: new Date(),
-      rejectionReason: null,
-      updatedById: currentUser.id,
-    });
-    return formatRecruiterJob(submitted, currentUser);
-  }
-
-  // Direct publishing requires company to be APPROVED
+  // 1. Verify company is APPROVED and ACTIVE
   assertCompanyEligibleToPublish(job.company);
 
+  // 2. Validate mandatory job fields, salary, experience, location & deadline
+  validateJobReadinessForPublish(job);
+
+  // 3. Perform synchronous duplicate and prohibited content checks
+  const preCheck = await moderationService.runPrePublishChecks({
+    companyId: job.companyId,
+    payload: job,
+    excludeJobId: job.id,
+  });
+  if (!preCheck.allowed) {
+    throw new ApiError(400, preCheck.message, preCheck.code);
+  }
+
+  const now = new Date();
   const published = await repo.updateJob(jobId, {
     status: 'PUBLISHED',
-    publishedAt: job.publishedAt || new Date(),
-    submittedAt: job.submittedAt || new Date(),
+    moderationStatus: 'NOT_REVIEWED',
+    contentHash: preCheck.contentHash || moderationService.computeJobContentHash(job),
+    publishedAt: job.publishedAt || now,
+    submittedAt: job.submittedAt || now,
     rejectionReason: null,
     updatedById: currentUser.id,
   });
+
+  // 4. Trigger non-blocking asynchronous background moderation
+  moderationService.scheduleAsyncModeration(published.id, 'JOB_PUBLISHED');
 
   return formatRecruiterJob(published, currentUser);
 };
@@ -454,6 +533,17 @@ exports.resumeJob = async (currentUser, jobId) => {
   const job = await getJobOrThrow(jobId);
   assertCanModifyJob(job, currentUser);
 
+  if (
+    job.moderationStatus === 'ACTION_REQUIRED' &&
+    currentUser.role !== 'admin'
+  ) {
+    throw new ApiError(
+      403,
+      'This job was paused/restricted by platform moderation and can only be restored after administrator review.',
+      'MODERATION_ACTION_REQUIRED'
+    );
+  }
+
   if (job.status !== 'PAUSED' && job.status !== 'EXPIRED') {
     throw new ApiError(
       400,
@@ -471,6 +561,8 @@ exports.resumeJob = async (currentUser, jobId) => {
     publishedAt: job.publishedAt || new Date(),
     updatedById: currentUser.id,
   });
+
+  moderationService.scheduleAsyncModeration(updated.id, 'JOB_RESUMED');
 
   return formatRecruiterJob(updated, currentUser);
 };
@@ -522,51 +614,157 @@ exports.archiveJob = async (currentUser, jobId) => {
   return formatRecruiterJob(updated, currentUser);
 };
 
-// ── Admin: Approve Job ───────────────────────────────────────────────────
-exports.approveJob = async (adminUser, jobId) => {
+// ── Candidate / User: Report Suspicious Job Posting ──────────────────────
+exports.reportJob = async (currentUser, jobId, { category, details }) => {
   const job = await getJobOrThrow(jobId);
 
-  if (!['PENDING_APPROVAL', 'REJECTED', 'DRAFT'].includes(job.status)) {
+  if (job.createdById === currentUser.id) {
+    throw new ApiError(400, 'You cannot report your own job posting', 'CANNOT_REPORT_OWN_JOB');
+  }
+
+  const result = await repo.createJobReport({
+    jobId,
+    reporterId: currentUser.id,
+    category,
+    details,
+  });
+
+  if (result.alreadyReported) {
     throw new ApiError(
-      400,
-      `Cannot approve a job in ${job.status} status`,
-      'INVALID_STATUS_TRANSITION'
+      409,
+      'You have already submitted a report for this job vacancy',
+      'ALREADY_REPORTED'
     );
   }
 
-  assertCompanyEligibleToPublish(job.company);
-  validateJobReadinessForPublish(job);
+  // Trigger non-blocking background moderation evaluation upon receiving a user report
+  moderationService.scheduleAsyncModeration(jobId, 'USER_REPORT');
 
-  const updated = await repo.updateJob(jobId, {
-    status: 'PUBLISHED',
-    publishedAt: job.publishedAt || new Date(),
-    approvedById: adminUser.id,
-    rejectionReason: null,
+  return {
+    report: result.report,
+    reportCount: result.job.reportCount,
+  };
+};
+
+// ── Admin: Get Moderation Audit Logs & Reports for a Job ─────────────────
+exports.getJobModerationDetails = async (currentUser, jobId) => {
+  const job = await getJobOrThrow(jobId);
+  assertCanAccessCompanyJob(job, currentUser);
+  const details = await repo.findJobModerationDetails(jobId);
+  return {
+    job: formatRecruiterJob(job, currentUser),
+    logs: details.logs,
+    reports: currentUser.role === 'admin' ? details.reports : [],
+  };
+};
+
+// ── Admin: Moderate Job (Clear, Place Under Review, Restrict, Reject, Restore) ──
+exports.moderateJob = async (adminUser, jobId, { action, reason }) => {
+  const job = await getJobOrThrow(jobId);
+  const now = new Date();
+
+  let newStatus = job.status;
+  let newModerationStatus = job.moderationStatus;
+  let updateData = {
+    moderatedAt: now,
+    moderatedById: adminUser.id,
+    moderationReason: reason,
     updatedById: adminUser.id,
+  };
+
+  if (action === 'CLEAR_FLAGS') {
+    newModerationStatus = 'CLEARED';
+    if (job.status === 'UNDER_REVIEW') {
+      assertCompanyEligibleToPublish(job.company);
+      validateJobReadinessForPublish(job);
+      newStatus = 'PUBLISHED';
+    }
+    updateData = {
+      ...updateData,
+      status: newStatus,
+      moderationStatus: newModerationStatus,
+      moderationFlags: [],
+      moderationScore: 0,
+      rejectionReason: null,
+    };
+  } else if (action === 'PLACE_UNDER_REVIEW') {
+    newStatus = 'UNDER_REVIEW';
+    newModerationStatus = 'UNDER_REVIEW';
+    updateData = {
+      ...updateData,
+      status: newStatus,
+      moderationStatus: newModerationStatus,
+    };
+  } else if (action === 'RESTRICT_JOB') {
+    // Restrict/pause job without deleting candidate applications
+    newStatus = 'PAUSED';
+    newModerationStatus = 'ACTION_REQUIRED';
+    updateData = {
+      ...updateData,
+      status: newStatus,
+      moderationStatus: newModerationStatus,
+      pausedAt: now,
+    };
+  } else if (action === 'REJECT_JOB') {
+    // Reject/suspend fraudulent job without deleting candidate applications
+    newStatus = 'REJECTED';
+    newModerationStatus = 'ACTION_REQUIRED';
+    updateData = {
+      ...updateData,
+      status: newStatus,
+      moderationStatus: newModerationStatus,
+      rejectionReason: reason,
+    };
+  } else if (action === 'RESTORE_JOB') {
+    assertCompanyEligibleToPublish(job.company);
+    validateJobReadinessForPublish(job);
+    newStatus = 'PUBLISHED';
+    newModerationStatus = 'CLEARED';
+    updateData = {
+      ...updateData,
+      status: newStatus,
+      moderationStatus: newModerationStatus,
+      moderationFlags: [],
+      moderationScore: 0,
+      publishedAt: job.publishedAt || now,
+      pausedAt: null,
+      rejectionReason: null,
+      approvedById: adminUser.id,
+    };
+  } else {
+    throw new ApiError(400, `Unsupported moderation action: ${action}`, 'INVALID_MODERATION_ACTION');
+  }
+
+  const updated = await repo.moderateJobWithLog({
+    jobId,
+    actorId: adminUser.id,
+    action,
+    previousStatus: job.status,
+    newStatus,
+    previousModerationStatus: job.moderationStatus,
+    newModerationStatus,
+    reason,
+    flags: updateData.moderationFlags ?? job.moderationFlags ?? [],
+    updateData,
   });
 
   return formatRecruiterJob(updated, adminUser);
 };
 
-// ── Admin: Reject Job ────────────────────────────────────────────────────
-exports.rejectJob = async (adminUser, jobId, reason) => {
-  const job = await getJobOrThrow(jobId);
-
-  if (!['PENDING_APPROVAL', 'PUBLISHED'].includes(job.status)) {
-    throw new ApiError(
-      400,
-      `Cannot reject a job in ${job.status} status`,
-      'INVALID_STATUS_TRANSITION'
-    );
-  }
-
-  const updated = await repo.updateJob(jobId, {
-    status: 'REJECTED',
-    rejectionReason: reason,
-    updatedById: adminUser.id,
+// ── Admin: Approve / Restore Job (Backward-compatible wrapper) ───────────
+exports.approveJob = async (adminUser, jobId, reason = 'Cleared and restored by administrator') => {
+  return exports.moderateJob(adminUser, jobId, {
+    action: 'RESTORE_JOB',
+    reason,
   });
+};
 
-  return formatRecruiterJob(updated, adminUser);
+// ── Admin: Reject Job (Backward-compatible wrapper) ──────────────────────
+exports.rejectJob = async (adminUser, jobId, reason) => {
+  return exports.moderateJob(adminUser, jobId, {
+    action: 'REJECT_JOB',
+    reason,
+  });
 };
 
 // ── Public Candidate Job Listing & Details ───────────────────────────────

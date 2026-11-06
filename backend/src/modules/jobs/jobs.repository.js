@@ -37,6 +37,7 @@ const jobDetailInclude = {
   createdBy: { select: safeUserSelect },
   updatedBy: { select: safeUserSelect },
   approvedBy: { select: safeUserSelect },
+  moderatedBy: { select: safeUserSelect },
 };
 
 const jobListInclude = {
@@ -170,20 +171,35 @@ exports.getDashboardStats = async (companyIds, db = prisma) => {
       publishedJobs: 0,
       draftJobs: 0,
       pendingApprovalJobs: 0,
+      underReviewJobs: 0,
       pausedJobs: 0,
       closedJobs: 0,
       rejectedJobs: 0,
       expiredJobs: 0,
       archivedJobs: 0,
+      flaggedJobs: 0,
+      reportedJobs: 0,
+      clearedJobs: 0,
       activeVacancies: 0,
     };
   }
 
-  const [grouped, vacanciesAgg] = await Promise.all([
+  const [grouped, moderationGrouped, reportedCount, vacanciesAgg] = await Promise.all([
     db.job.groupBy({
       by: ['status'],
       where: whereScope,
       _count: { _all: true },
+    }),
+    db.job.groupBy({
+      by: ['moderationStatus'],
+      where: whereScope,
+      _count: { _all: true },
+    }),
+    db.job.count({
+      where: {
+        ...whereScope,
+        reportCount: { gt: 0 },
+      },
     }),
     db.job.aggregate({
       where: {
@@ -203,6 +219,7 @@ exports.getDashboardStats = async (companyIds, db = prisma) => {
     REJECTED: 0,
     EXPIRED: 0,
     ARCHIVED: 0,
+    UNDER_REVIEW: 0,
   };
 
   let totalJobs = 0;
@@ -211,16 +228,31 @@ exports.getDashboardStats = async (companyIds, db = prisma) => {
     totalJobs += row._count._all;
   }
 
+  const modCounts = {
+    NOT_REVIEWED: 0,
+    FLAGGED: 0,
+    UNDER_REVIEW: 0,
+    ACTION_REQUIRED: 0,
+    CLEARED: 0,
+  };
+  for (const row of moderationGrouped) {
+    modCounts[row.moderationStatus] = row._count._all;
+  }
+
   return {
     totalJobs,
     publishedJobs: counts.PUBLISHED,
     draftJobs: counts.DRAFT,
     pendingApprovalJobs: counts.PENDING_APPROVAL,
+    underReviewJobs: counts.UNDER_REVIEW + modCounts.UNDER_REVIEW,
     pausedJobs: counts.PAUSED,
     closedJobs: counts.CLOSED,
     rejectedJobs: counts.REJECTED,
     expiredJobs: counts.EXPIRED,
     archivedJobs: counts.ARCHIVED,
+    flaggedJobs: modCounts.FLAGGED + modCounts.ACTION_REQUIRED,
+    reportedJobs: reportedCount,
+    clearedJobs: modCounts.CLEARED,
     activeVacancies: vacanciesAgg._sum.numberOfOpenings || 0,
   };
 };
@@ -231,6 +263,8 @@ exports.findJobsForManagement = async (
     q = '',
     companyId,
     status,
+    moderationStatus,
+    flaggedOnly = false,
     employmentType,
     workMode,
     location,
@@ -255,6 +289,18 @@ exports.findJobsForManagement = async (
   }
   if (status) {
     andFilters.push({ status });
+  }
+  if (moderationStatus) {
+    andFilters.push({ moderationStatus });
+  }
+  if (flaggedOnly) {
+    andFilters.push({
+      OR: [
+        { moderationStatus: { in: ['FLAGGED', 'UNDER_REVIEW', 'ACTION_REQUIRED'] } },
+        { status: 'UNDER_REVIEW' },
+        { reportCount: { gt: 0 } },
+      ],
+    });
   }
   if (employmentType) {
     andFilters.push({ employmentType });
@@ -450,4 +496,119 @@ exports.findPublicJobs = async (
     limit,
     totalPages: Math.max(1, Math.ceil(total / limit)),
   };
+};
+
+exports.createJobReport = async ({ jobId, reporterId, category, details }, db = prisma) => {
+  return db.$transaction(async (tx) => {
+    const existing = await tx.jobReport.findUnique({
+      where: {
+        jobId_reporterId: { jobId, reporterId },
+      },
+    });
+
+    if (existing) {
+      return { alreadyReported: true, report: existing };
+    }
+
+    const report = await tx.jobReport.create({
+      data: {
+        jobId,
+        reporterId,
+        category,
+        details: details || null,
+        status: 'OPEN',
+      },
+    });
+
+    const updatedJob = await tx.job.update({
+      where: { id: jobId },
+      data: {
+        reportCount: { increment: 1 },
+      },
+    });
+
+    await tx.jobModerationLog.create({
+      data: {
+        jobId,
+        actorId: reporterId,
+        actorType: 'USER',
+        action: 'USER_REPORT',
+        previousStatus: updatedJob.status,
+        newStatus: updatedJob.status,
+        previousModerationStatus: updatedJob.moderationStatus,
+        newModerationStatus: updatedJob.moderationStatus,
+        reason: `Reported for ${category}${details ? `: ${details}` : ''}`,
+        flags: ['USER_REPORTED'],
+        metadata: { category, reportId: report.id },
+      },
+    });
+
+    return { alreadyReported: false, report, job: updatedJob };
+  });
+};
+
+exports.findJobModerationDetails = async (jobId, db = prisma) => {
+  const [logs, reports] = await Promise.all([
+    db.jobModerationLog.findMany({
+      where: { jobId },
+      include: { actor: { select: safeUserSelect } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
+    db.jobReport.findMany({
+      where: { jobId },
+      include: { reporter: { select: safeUserSelect } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
+  ]);
+  return { logs, reports };
+};
+
+exports.moderateJobWithLog = async (
+  {
+    jobId,
+    actorId,
+    action,
+    previousStatus,
+    newStatus,
+    previousModerationStatus,
+    newModerationStatus,
+    reason,
+    flags,
+    updateData,
+  },
+  db = prisma
+) => {
+  return db.$transaction(async (tx) => {
+    const updatedJob = await tx.job.update({
+      where: { id: jobId },
+      data: updateData,
+      include: jobDetailInclude,
+    });
+
+    if (action === 'CLEAR_FLAGS' || action === 'RESTORE_JOB') {
+      await tx.jobReport.updateMany({
+        where: { jobId, status: 'OPEN' },
+        data: { status: 'REVIEWED' },
+      });
+    }
+
+    await tx.jobModerationLog.create({
+      data: {
+        jobId,
+        actorId,
+        actorType: 'ADMIN',
+        action,
+        previousStatus,
+        newStatus,
+        previousModerationStatus,
+        newModerationStatus,
+        reason,
+        flags: flags || [],
+      },
+    });
+
+    return updatedJob;
+  });
 };

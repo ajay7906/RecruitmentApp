@@ -25,6 +25,7 @@ import { CreateJobPage } from "../features/jobs/pages/CreateJobPage";
 import { EditJobPage } from "../features/jobs/pages/EditJobPage";
 import { RecruiterJobDetailsPage } from "../features/jobs/pages/RecruiterJobDetailsPage";
 import { JobApprovalStatusPage } from "../features/jobs/pages/JobApprovalStatusPage";
+import { AdminJobModerationPage } from "../features/jobs/pages/AdminJobModerationPage";
 import { ApplicationsPage } from "../features/applications/pages/ApplicationsPage";
 import { MyApplicationsPage } from "../features/applications/pages/MyApplicationsPage";
 import { JobApplicationPage } from "../features/applications/pages/JobApplicationPage";
@@ -129,6 +130,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={["admin"]}>
             <AdminCompaniesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "admin/jobs",
+        element: (
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminJobModerationPage />
           </ProtectedRoute>
         ),
       },
