@@ -9,6 +9,13 @@ import { VerifyEmailPage } from "../features/auth/pages/VerifyEmailPage";
 import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
 import { ProfilePage } from "../features/candidate-profile/pages/ProfilePage";
 import { RecruiterProfilePage } from "../features/recruiter/pages/RecruiterProfilePage";
+import { MyCompaniesPage } from "../features/companies/pages/MyCompaniesPage";
+import { CompanyRegistrationPage } from "../features/companies/pages/CompanyRegistrationPage";
+import { CompanyDashboardPage } from "../features/companies/pages/CompanyDashboardPage";
+import { CompanyDetailsPage } from "../features/companies/pages/CompanyDetailsPage";
+import { EditCompanyPage } from "../features/companies/pages/EditCompanyPage";
+import { CompanyApprovalPage } from "../features/companies/pages/CompanyApprovalPage";
+import { AdminCompaniesPage } from "../features/companies/pages/AdminCompaniesPage";
 import { JobsPage } from "../features/jobs/pages/JobsPage";
 import { ApplicationsPage } from "../features/applications/pages/ApplicationsPage";
 import { NotFoundPage } from "../features/misc/pages/NotFoundPage";
@@ -43,6 +50,58 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
       { path: "profile", element: <RoleBasedProfilePage /> },
+      {
+        path: "companies",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <MyCompaniesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "companies/new",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <CompanyRegistrationPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "companies/:id",
+        element: <CompanyDetailsPage />,
+      },
+      {
+        path: "companies/:id/dashboard",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <CompanyDashboardPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "companies/:id/edit",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <EditCompanyPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "companies/:id/approval",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <CompanyApprovalPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "admin/companies",
+        element: (
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminCompaniesPage />
+          </ProtectedRoute>
+        ),
+      },
       { path: "jobs", element: <JobsPage /> },
       { path: "applications", element: <ApplicationsPage /> },
     ],

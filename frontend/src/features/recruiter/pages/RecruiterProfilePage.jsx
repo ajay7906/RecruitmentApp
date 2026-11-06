@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   UserRound,
   Briefcase,
@@ -18,6 +19,7 @@ import {
   Users2,
   Layers,
   XCircle,
+  LayoutDashboard,
 } from "lucide-react";
 
 import { recruiterApi } from "../api/recruiterApi";
@@ -272,7 +274,7 @@ export function RecruiterProfilePage() {
         {/* ── Company section ── */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           {/* Section header */}
-          <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5 sm:p-6">
             <div className="flex items-center gap-3">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-600">
                 <Building2 size={20} />
@@ -288,9 +290,15 @@ export function RecruiterProfilePage() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               {linkedCompany ? (
                 <>
+                  <Link
+                    to={`/app/companies/${linkedCompany.id}/dashboard`}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 px-3 py-2 text-xs font-semibold text-brand hover:bg-blue-100"
+                  >
+                    <LayoutDashboard size={13} /> Company Dashboard
+                  </Link>
                   <Button
                     variant="secondary"
                     className="gap-1.5 text-xs"
@@ -298,7 +306,7 @@ export function RecruiterProfilePage() {
                       setCompanyModal({ open: true, company: linkedCompany })
                     }
                   >
-                    <Pencil size={13} /> Edit company
+                    <Pencil size={13} /> Quick Edit
                   </Button>
                   <Button
                     variant="ghost"
@@ -310,12 +318,21 @@ export function RecruiterProfilePage() {
                   </Button>
                 </>
               ) : (
-                <Button
-                  className="gap-1.5 text-sm"
-                  onClick={() => setCompanyModal({ open: true, company: null })}
-                >
-                  <Plus size={15} /> Add company
-                </Button>
+                <>
+                  <Link
+                    to="/app/companies/new"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-2.5 text-xs font-semibold text-white hover:bg-blue-700"
+                  >
+                    <Plus size={14} /> Full Registration
+                  </Link>
+                  <Button
+                    variant="secondary"
+                    className="gap-1.5 text-xs"
+                    onClick={() => setCompanyModal({ open: true, company: null })}
+                  >
+                    <Plus size={14} /> Quick Add
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -391,8 +408,16 @@ function CompanyCard({ company }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
       <div className="mb-4 flex items-center gap-3">
-        <div className="grid h-12 w-12 place-items-center rounded-xl bg-blue-600 text-white">
-          <Building2 size={22} />
+        <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-xl bg-blue-600 text-white">
+          {company.logoUrl ? (
+            <img
+              src={company.logoUrl}
+              alt={company.name}
+              className="h-full w-full bg-white object-contain p-1"
+            />
+          ) : (
+            <Building2 size={22} />
+          )}
         </div>
         <div>
           <div className="flex items-center gap-2">

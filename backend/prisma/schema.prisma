@@ -30,6 +30,32 @@ enum AuthTokenType {
   @@map("auth_token_type")
 }
 
+enum CompanyStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUSPENDED
+
+  @@map("company_status")
+}
+
+enum CompanyMemberRole {
+  OWNER
+  ADMIN
+  RECRUITER
+
+  @@map("company_member_role")
+}
+
+enum CompanyMembershipStatus {
+  ACTIVE
+  INVITED
+  REMOVED
+
+  @@map("company_membership_status")
+}
+
 model User {
   id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email           String     @unique // zod already lowercases it; see README note about citext
@@ -41,10 +67,13 @@ model User {
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  authTokens       AuthToken[]
-  refreshTokens    RefreshToken[]
-  candidateProfile CandidateProfile?
-  recruiterProfile RecruiterProfile?
+  authTokens         AuthToken[]
+  refreshTokens      RefreshToken[]
+  candidateProfile   CandidateProfile?
+  recruiterProfile   RecruiterProfile?
+  ownedCompanies     Company[]           @relation("CompanyOwner")
+  approvedCompanies  Company[]           @relation("CompanyApprover")
+  companyMemberships CompanyMembership[]
 
   @@map("users")
 }
@@ -114,19 +143,61 @@ model CandidateProfile {
 }
 
 model Company {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  website     String?
-  description String?
-  industry    String?
-  companySize String?  @map("company_size")
-  location    String?
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String
+  logoUrl            String?       @map("logo_url")
+  website            String?
+  email              String?
+  contactNumber      String?       @map("contact_number")
+  industry           String?
+  companySize        String?       @map("company_size")
+  companyType        String?       @map("company_type")
+  foundedYear        Int?          @map("founded_year")
+  country            String?
+  state              String?
+  city               String?
+  address            String?
+  location           String?
+  description        String?
+  linkedinUrl        String?       @map("linkedin_url")
+  gstin              String?
+  registrationNumber String?       @map("registration_number")
+  ownerId            String?       @map("owner_id") @db.Uuid
+  status             CompanyStatus @default(DRAFT)
+  rejectionReason    String?       @map("rejection_reason")
+  suspensionReason   String?       @map("suspension_reason")
+  submittedAt        DateTime?     @map("submitted_at") @db.Timestamptz(6)
+  approvedAt         DateTime?     @map("approved_at") @db.Timestamptz(6)
+  approvedById       String?       @map("approved_by") @db.Uuid
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  recruiters RecruiterProfile[]
+  owner       User?               @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  approvedBy  User?               @relation("CompanyApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  recruiters  RecruiterProfile[]
+  memberships CompanyMembership[]
 
+  @@index([ownerId], map: "idx_companies_owner_id")
+  @@index([status], map: "idx_companies_status")
+  @@index([name], map: "idx_companies_name")
   @@map("companies")
+}
+
+model CompanyMembership {
+  id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String                  @map("company_id") @db.Uuid
+  userId           String                  @map("user_id") @db.Uuid
+  role             CompanyMemberRole       @default(RECRUITER)
+  membershipStatus CompanyMembershipStatus @default(ACTIVE) @map("membership_status")
+  joinedAt         DateTime                @default(now()) @map("joined_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId], map: "uq_company_memberships_company_user")
+  @@index([companyId], map: "idx_company_memberships_company_id")
+  @@index([userId], map: "idx_company_memberships_user_id")
+  @@map("company_memberships")
 }
 
 model RecruiterProfile {
