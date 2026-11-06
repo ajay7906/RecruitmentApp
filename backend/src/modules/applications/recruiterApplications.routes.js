@@ -1,6 +1,8 @@
 const router = require('express').Router();
 const c = require('./applications.controller');
 const v = require('./applications.validation');
+const interviewController = require('../interviews/interviews.controller');
+const interviewValidation = require('../interviews/interviews.validation');
 const validate = require('../../middlewares/validate');
 const { authenticate } = require('../../middlewares/authenticate');
 const { requireRole } = require('../../middlewares/authorize');
@@ -42,6 +44,19 @@ router.get(
   '/:id/resume',
   validate(v.applicationIdParam),
   c.getApplicationResume
+);
+
+// Hiring Decision endpoints
+router.post(
+  '/:id/decision',
+  validate(interviewValidation.createHiringDecision),
+  interviewController.makeHiringDecision
+);
+
+router.get(
+  '/:id/decision',
+  validate(interviewValidation.interviewIdParam),
+  interviewController.getHiringDecision
 );
 
 module.exports = router;

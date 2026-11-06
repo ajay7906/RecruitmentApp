@@ -31,6 +31,13 @@ import { JobApplicationPage } from "../features/applications/pages/JobApplicatio
 import { CandidateApplicationDetailsPage } from "../features/applications/pages/CandidateApplicationDetailsPage";
 import { RecruiterApplicationsDashboardPage } from "../features/applications/pages/RecruiterApplicationsDashboardPage";
 import { RecruiterApplicationReviewPage } from "../features/applications/pages/RecruiterApplicationReviewPage";
+import { InterviewDashboardPage } from "../features/interviews/pages/InterviewDashboardPage";
+import { ScheduleInterviewPage } from "../features/interviews/pages/ScheduleInterviewPage";
+import { EditInterviewPage } from "../features/interviews/pages/EditInterviewPage";
+import { RecruiterInterviewDetailsPage } from "../features/interviews/pages/RecruiterInterviewDetailsPage";
+import { HiringDashboardPage } from "../features/interviews/pages/HiringDashboardPage";
+import { MyInterviewsPage } from "../features/interviews/pages/MyInterviewsPage";
+import { CandidateInterviewDetailsPage } from "../features/interviews/pages/CandidateInterviewDetailsPage";
 import { NotFoundPage } from "../features/misc/pages/NotFoundPage";
 import { useAuthStore } from "../stores/authStore";
 
@@ -216,6 +223,62 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
             <RecruiterApplicationReviewPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "recruiter/interviews",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <InterviewDashboardPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "recruiter/interviews/new",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <ScheduleInterviewPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "recruiter/interviews/:id",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <RecruiterInterviewDetailsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "recruiter/interviews/:id/edit",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <EditInterviewPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "recruiter/hiring",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <HiringDashboardPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "interviews",
+        element: (
+          <ProtectedRoute allowedRoles={["candidate"]}>
+            <MyInterviewsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "interviews/:id",
+        element: (
+          <ProtectedRoute allowedRoles={["candidate"]}>
+            <CandidateInterviewDetailsPage />
           </ProtectedRoute>
         ),
       },

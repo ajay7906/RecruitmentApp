@@ -92,6 +92,71 @@ enum ResumeProcessingStatus {
   @@map("resume_processing_status")
 }
 
+enum InterviewStatus {
+  DRAFT
+  SCHEDULED
+  RESCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+
+  @@map("interview_status")
+}
+
+enum InterviewMode {
+  ONLINE
+  IN_PERSON
+  TELEPHONIC
+
+  @@map("interview_mode")
+}
+
+enum InterviewerRole {
+  PRIMARY_INTERVIEWER
+  TECHNICAL_INTERVIEWER
+  HR_INTERVIEWER
+  OBSERVER
+
+  @@map("interviewer_role")
+}
+
+enum InterviewerAssignmentStatus {
+  ASSIGNED
+  ACCEPTED
+  DECLINED
+  COMPLETED
+  REMOVED
+
+  @@map("interviewer_assignment_status")
+}
+
+enum FeedbackRecommendation {
+  STRONG_HIRE
+  HIRE
+  HOLD
+  REJECT
+
+  @@map("feedback_recommendation")
+}
+
+enum HiringDecisionType {
+  SELECTED
+  REJECTED
+  ON_HOLD
+
+  @@map("hiring_decision_type")
+}
+
+enum RescheduleRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("reschedule_request_status")
+}
+
 model User {
   id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email           String     @unique // zod already lowercases it; see README note about citext
@@ -107,15 +172,15 @@ model User {
   refreshTokens             RefreshToken[]
   candidateProfile          CandidateProfile?
   recruiterProfile          RecruiterProfile?
-  ownedCompanies            Company[]                  @relation("CompanyOwner")
-  approvedCompanies         Company[]                  @relation("CompanyApprover")
+  ownedCompanies            Company[]                     @relation("CompanyOwner")
+  approvedCompanies         Company[]                     @relation("CompanyApprover")
   companyMemberships        CompanyMembership[]
-  createdJobs               Job[]                      @relation("JobCreator")
-  updatedJobs               Job[]                      @relation("JobUpdater")
-  approvedJobs              Job[]                      @relation("JobApprover")
-  candidateApplications     Application[]              @relation("CandidateApplications")
-  reviewedApplications      Application[]              @relation("RecruiterReviewedApplications")
-  applicationStatusChanges  ApplicationStatusHistory[] @relation("ApplicationStatusChangedBy")
+  createdJobs               Job[]                         @relation("JobCreator")
+  updatedJobs               Job[]                         @relation("JobUpdater")
+  approvedJobs              Job[]                         @relation("JobApprover")
+  candidateApplications     Application[]                 @relation("CandidateApplications")
+  reviewedApplications      Application[]                 @relation("RecruiterReviewedApplications")
+  applicationStatusChanges  ApplicationStatusHistory[]    @relation("ApplicationStatusChangedBy")
 
   candidateResumes          CandidateResume[]
   candidateSkills           CandidateSkill[]
@@ -125,6 +190,19 @@ model User {
   candidateCertifications   CandidateCertification[]
   candidateAchievements     CandidateAchievement[]
   candidateLanguages        CandidateLanguage[]
+
+  candidateInterviews       Interview[]                   @relation("CandidateInterviews")
+  createdInterviews         Interview[]                   @relation("InterviewCreator")
+  updatedInterviews         Interview[]                   @relation("InterviewUpdater")
+  cancelledInterviews       Interview[]                   @relation("InterviewCanceller")
+  interviewerAssignments    InterviewerAssignment[]       @relation("AssignedInterviewer")
+  assignedByInterviews      InterviewerAssignment[]       @relation("InterviewerAssignedBy")
+  interviewFeedbacks        InterviewFeedback[]           @relation("InterviewerFeedbacks")
+  interviewHistoryChanges   InterviewHistory[]            @relation("InterviewHistoryChangedBy")
+  rescheduleRequests        InterviewRescheduleRequest[]  @relation("CandidateRescheduleRequests")
+  reviewedRescheduleReqs    InterviewRescheduleRequest[]  @relation("RecruiterReviewedRescheduleRequests")
+  candidateHiringDecisions  HiringDecision[]              @relation("CandidateHiringDecisions")
+  madeHiringDecisions       HiringDecision[]              @relation("HiringDecisionMaker")
 
   @@map("users")
 }
@@ -409,12 +487,14 @@ model Company {
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  owner        User?               @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  approvedBy   User?               @relation("CompanyApprover", fields: [approvedById], references: [id], onDelete: SetNull)
-  recruiters   RecruiterProfile[]
-  memberships  CompanyMembership[]
-  jobs         Job[]
-  applications Application[]
+  owner           User?               @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  approvedBy      User?               @relation("CompanyApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  recruiters      RecruiterProfile[]
+  memberships     CompanyMembership[]
+  jobs            Job[]
+  applications    Application[]
+  interviews      Interview[]
+  hiringDecisions HiringDecision[]
 
   @@index([ownerId], map: "idx_companies_owner_id")
   @@index([status], map: "idx_companies_status")
@@ -523,11 +603,13 @@ model Job {
   createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdBy    User          @relation("JobCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy    User?         @relation("JobUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
-  approvedBy   User?         @relation("JobApprover", fields: [approvedById], references: [id], onDelete: SetNull)
-  applications Application[]
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy       User             @relation("JobCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy       User?            @relation("JobUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  approvedBy      User?            @relation("JobApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  applications    Application[]
+  interviews      Interview[]
+  hiringDecisions HiringDecision[]
 
   @@index([companyId], map: "idx_jobs_company_id")
   @@index([createdById], map: "idx_jobs_created_by")
@@ -571,12 +653,15 @@ model Application {
   createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  job           Job                        @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  candidate     User                       @relation("CandidateApplications", fields: [candidateId], references: [id], onDelete: Cascade)
-  company       Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  reviewedBy    User?                      @relation("RecruiterReviewedApplications", fields: [reviewedById], references: [id], onDelete: SetNull)
-  resume        CandidateResume?           @relation(fields: [resumeId], references: [id], onDelete: SetNull)
-  statusHistory ApplicationStatusHistory[]
+  job             Job                        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate       User                       @relation("CandidateApplications", fields: [candidateId], references: [id], onDelete: Cascade)
+  company         Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reviewedBy      User?                      @relation("RecruiterReviewedApplications", fields: [reviewedById], references: [id], onDelete: SetNull)
+  resume          CandidateResume?           @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  statusHistory   ApplicationStatusHistory[]
+  interviews      Interview[]
+  feedbacks       InterviewFeedback[]
+  hiringDecisions HiringDecision[]
 
   @@unique([jobId, candidateId], map: "uq_applications_job_candidate")
   @@index([candidateId], map: "idx_applications_candidate_id")
@@ -604,4 +689,188 @@ model ApplicationStatusHistory {
   @@index([applicationId], map: "idx_app_status_history_application_id")
   @@index([changedAt], map: "idx_app_status_history_changed_at")
   @@map("application_status_history")
+}
+
+model Interview {
+  id                       String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId            String          @map("application_id") @db.Uuid
+  jobId                    String          @map("job_id") @db.Uuid
+  candidateId              String          @map("candidate_id") @db.Uuid
+  companyId                String          @map("company_id") @db.Uuid
+
+  title                    String          @map("interview_title")
+  roundNumber              Int             @default(1) @map("round_number")
+  interviewType            String          @map("interview_type")
+  interviewMode            InterviewMode   @default(ONLINE) @map("interview_mode")
+
+  interviewDate            DateTime        @map("interview_date") @db.Timestamptz(6)
+  startTime                DateTime        @map("start_time") @db.Timestamptz(6)
+  endTime                  DateTime        @map("end_time") @db.Timestamptz(6)
+  timeZone                 String          @default("Asia/Kolkata") @map("time_zone")
+
+  location                 String?
+  meetingLink              String?         @map("meeting_link")
+  description              String?
+  instructions             String?
+  allowCandidateReschedule Boolean         @default(true) @map("allow_candidate_reschedule")
+
+  status                   InterviewStatus @default(SCHEDULED)
+  candidateConfirmedAt     DateTime?       @map("candidate_confirmed_at") @db.Timestamptz(6)
+  noShowParty              String?         @map("no_show_party")
+
+  cancellationReason       String?         @map("cancellation_reason")
+  cancellationType         String?         @map("cancellation_type")
+  cancelledById            String?         @map("cancelled_by") @db.Uuid
+  cancelledAt              DateTime?       @map("cancelled_at") @db.Timestamptz(6)
+
+  createdById              String          @map("created_by") @db.Uuid
+  updatedById              String?         @map("updated_by") @db.Uuid
+  completedAt              DateTime?       @map("completed_at") @db.Timestamptz(6)
+  createdAt                DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  application        Application                  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  job                Job                          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate          User                         @relation("CandidateInterviews", fields: [candidateId], references: [id], onDelete: Cascade)
+  company            Company                      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy          User                         @relation("InterviewCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy          User?                        @relation("InterviewUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  cancelledBy        User?                        @relation("InterviewCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
+
+  interviewers       InterviewerAssignment[]
+  feedbacks          InterviewFeedback[]
+  history            InterviewHistory[]
+  rescheduleRequests InterviewRescheduleRequest[]
+
+  @@index([applicationId, roundNumber], map: "idx_interviews_application_round")
+  @@index([candidateId], map: "idx_interviews_candidate_id")
+  @@index([companyId], map: "idx_interviews_company_id")
+  @@index([jobId], map: "idx_interviews_job_id")
+  @@index([status], map: "idx_interviews_status")
+  @@index([startTime], map: "idx_interviews_start_time")
+  @@map("interviews")
+}
+
+model InterviewerAssignment {
+  id               String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  interviewId      String                      @map("interview_id") @db.Uuid
+  interviewerId    String                      @map("interviewer_id") @db.Uuid
+  interviewerRole  InterviewerRole             @default(TECHNICAL_INTERVIEWER) @map("interviewer_role")
+  assignmentStatus InterviewerAssignmentStatus @default(ASSIGNED) @map("assignment_status")
+  assignedById     String?                     @map("assigned_by") @db.Uuid
+  assignedAt       DateTime                    @default(now()) @map("assigned_at") @db.Timestamptz(6)
+  removedAt        DateTime?                   @map("removed_at") @db.Timestamptz(6)
+  updatedAt        DateTime                    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  interviewer User      @relation("AssignedInterviewer", fields: [interviewerId], references: [id], onDelete: Cascade)
+  assignedBy  User?     @relation("InterviewerAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([interviewId, interviewerId], map: "uq_interviewer_assignments_interview_user")
+  @@index([interviewerId], map: "idx_interviewer_assignments_user")
+  @@index([interviewId], map: "idx_interviewer_assignments_interview")
+  @@map("interviewer_assignments")
+}
+
+model InterviewFeedback {
+  id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  interviewId           String                 @map("interview_id") @db.Uuid
+  applicationId         String                 @map("application_id") @db.Uuid
+  interviewerId         String                 @map("interviewer_id") @db.Uuid
+
+  overallRating         Int                    @map("overall_rating")
+  technicalRating       Int?                   @map("technical_rating")
+  communicationRating   Int?                   @map("communication_rating")
+  problemSolvingRating  Int?                   @map("problem_solving_rating")
+  experienceRating      Int?                   @map("experience_rating")
+
+  strengths             String?
+  weaknesses            String?
+  detailedFeedback      String                 @map("detailed_feedback")
+  recommendation        FeedbackRecommendation
+  isFinalSubmitted      Boolean                @default(true) @map("is_final_submitted")
+
+  submittedAt           DateTime               @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  updatedAt             DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  interview   Interview   @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interviewer User        @relation("InterviewerFeedbacks", fields: [interviewerId], references: [id], onDelete: Cascade)
+
+  @@unique([interviewId, interviewerId], map: "uq_interview_feedbacks_interview_interviewer")
+  @@index([interviewId], map: "idx_interview_feedbacks_interview")
+  @@index([applicationId], map: "idx_interview_feedbacks_application")
+  @@index([interviewerId], map: "idx_interview_feedbacks_interviewer")
+  @@map("interview_feedbacks")
+}
+
+model InterviewHistory {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  interviewId      String           @map("interview_id") @db.Uuid
+  action           String
+  previousStatus   InterviewStatus? @map("previous_status")
+  newStatus        InterviewStatus? @map("new_status")
+  previousSchedule Json?            @map("previous_schedule")
+  newSchedule      Json?            @map("new_schedule")
+  metadata         Json?
+  reason           String?
+  changedById      String?          @map("changed_by") @db.Uuid
+  changedByRole    String           @map("changed_by_role")
+  changedAt        DateTime         @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  changedBy User?     @relation("InterviewHistoryChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([interviewId], map: "idx_interview_history_interview")
+  @@index([changedAt], map: "idx_interview_history_changed_at")
+  @@map("interview_history")
+}
+
+model InterviewRescheduleRequest {
+  id                 String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  interviewId        String                  @map("interview_id") @db.Uuid
+  candidateId        String                  @map("candidate_id") @db.Uuid
+  requestedDate      DateTime                @map("requested_date") @db.Timestamptz(6)
+  requestedStartTime DateTime                @map("requested_start_time") @db.Timestamptz(6)
+  requestedEndTime   DateTime                @map("requested_end_time") @db.Timestamptz(6)
+  timeZone           String                  @default("Asia/Kolkata") @map("time_zone")
+  reason             String
+  status             RescheduleRequestStatus @default(PENDING)
+  reviewedById       String?                 @map("reviewed_by") @db.Uuid
+  reviewNotes        String?                 @map("review_notes")
+  reviewedAt         DateTime?               @map("reviewed_at") @db.Timestamptz(6)
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  interview  Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  candidate  User      @relation("CandidateRescheduleRequests", fields: [candidateId], references: [id], onDelete: Cascade)
+  reviewedBy User?     @relation("RecruiterReviewedRescheduleRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([interviewId], map: "idx_reschedule_requests_interview")
+  @@index([candidateId], map: "idx_reschedule_requests_candidate")
+  @@map("interview_reschedule_requests")
+}
+
+model HiringDecision {
+  id                      String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId           String             @map("application_id") @db.Uuid
+  jobId                   String             @map("job_id") @db.Uuid
+  candidateId             String             @map("candidate_id") @db.Uuid
+  companyId               String             @map("company_id") @db.Uuid
+  decision                HiringDecisionType
+  targetApplicationStatus ApplicationStatus? @map("target_application_status")
+  decisionReason          String             @map("decision_reason")
+  internalNotes           String?            @map("internal_notes")
+  decidedById             String             @map("decided_by") @db.Uuid
+  decidedAt               DateTime           @default(now()) @map("decided_at") @db.Timestamptz(6)
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  job         Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate   User        @relation("CandidateHiringDecisions", fields: [candidateId], references: [id], onDelete: Cascade)
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  decidedBy   User        @relation("HiringDecisionMaker", fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([applicationId], map: "idx_hiring_decisions_application")
+  @@index([companyId], map: "idx_hiring_decisions_company")
+  @@index([jobId], map: "idx_hiring_decisions_job")
+  @@map("hiring_decisions")
 }

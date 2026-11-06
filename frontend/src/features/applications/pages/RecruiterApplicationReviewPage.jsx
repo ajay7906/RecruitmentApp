@@ -16,16 +16,20 @@ import {
   GraduationCap,
   FolderGit2,
   Award,
+  CalendarPlus,
   Languages as LanguagesIcon,
 } from "lucide-react";
 
 import { applicationsApi } from "../api/applicationsApi";
+import { interviewsApi } from "../../interviews/api/interviewsApi";
 import { APPLICATION_STATUS_META } from "../schema/applicationSchemas";
 import { ApplicationStatusBadge } from "../components/ApplicationStatusBadge";
 import { ApplicationTimeline } from "../components/ApplicationTimeline";
 import { ResumeViewer } from "../components/ResumeViewer";
 import { StatusUpdateDialog } from "../components/StatusUpdateDialog";
 import { RecruiterNotes } from "../components/RecruiterNotes";
+import { InterviewRoundList } from "../../interviews/components/InterviewRoundList";
+import { HiringDecisionDialog } from "../../interviews/components/HiringDecisionDialog";
 import { EducationCard } from "../../candidate-profile/components/EducationCard";
 import { ExperienceCard } from "../../candidate-profile/components/ExperienceCard";
 import { LoadingState } from "../../../components/feedback/LoadingState";
@@ -40,10 +44,17 @@ export function RecruiterApplicationReviewPage() {
     open: false,
     targetStatus: "",
   });
+  const [hiringDecisionOpen, setHiringDecisionOpen] = useState(false);
 
   const query = useQuery({
     queryKey: ["applications", "recruiter-detail", id],
     queryFn: () => applicationsApi.getRecruiterApplicationById(id),
+    retry: false,
+  });
+
+  const decisionQuery = useQuery({
+    queryKey: ["interviews", "application-rounds", id],
+    queryFn: () => interviewsApi.getHiringDecision(id),
     retry: false,
   });
 
@@ -72,6 +83,21 @@ export function RecruiterApplicationReviewPage() {
     onError: (err) => {
       toast.error(
         err?.response?.data?.message || "Failed to save internal note."
+      );
+    },
+  });
+
+  const hiringDecisionMutation = useMutation({
+    mutationFn: (payload) => interviewsApi.makeHiringDecision(id, payload),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      queryClient.invalidateQueries({ queryKey: ["interviews"] });
+      setHiringDecisionOpen(false);
+      toast.success(res?.message || "Hiring decision recorded.");
+    },
+    onError: (err) => {
+      toast.error(
+        err?.response?.data?.message || "Could not record hiring decision."
       );
     },
   });
@@ -119,24 +145,45 @@ export function RecruiterApplicationReviewPage() {
   const candidateExperience =
     app.candidateExperience ?? profile.yearsOfExperience ?? null;
 
-  const structuredSkills = Array.isArray(profile.skills) ? profile.skills : [];
+  const structuredSkills = Array.isArray(candidate.skills)
+    ? candidate.skills
+    : Array.isArray(profile.skills)
+    ? profile.skills
+    : [];
   const skills =
     app.candidateSkills?.length > 0
       ? app.candidateSkills
       : structuredSkills.map((s) => (typeof s === "string" ? s : s.name));
 
-  const educations = Array.isArray(profile.educations) ? profile.educations : [];
-  const experiences = Array.isArray(profile.experiences)
+  const educations = Array.isArray(candidate.education)
+    ? candidate.education
+    : Array.isArray(profile.educations)
+    ? profile.educations
+    : [];
+  const experiences = Array.isArray(candidate.experience)
+    ? candidate.experience
+    : Array.isArray(profile.experiences)
     ? profile.experiences
     : [];
-  const projects = Array.isArray(profile.projects) ? profile.projects : [];
-  const certifications = Array.isArray(profile.certifications)
+  const projects = Array.isArray(candidate.projects)
+    ? candidate.projects
+    : Array.isArray(profile.projects)
+    ? profile.projects
+    : [];
+  const certifications = Array.isArray(candidate.certifications)
+    ? candidate.certifications
+    : Array.isArray(profile.certifications)
     ? profile.certifications
     : [];
-  const languages = Array.isArray(profile.languages) ? profile.languages : [];
+  const languages = Array.isArray(candidate.languages)
+    ? candidate.languages
+    : Array.isArray(profile.languages)
+    ? profile.languages
+    : [];
 
   const allowedStatuses = app.allowedNextStatuses || [];
   const answers = Array.isArray(app.answers) ? app.answers : [];
+  const interviewRounds = decisionQuery.data?.interviewRounds || [];
 
   return (
     <div className="space-y-6">
@@ -222,31 +269,32 @@ export function RecruiterApplicationReviewPage() {
             </div>
           </div>
 
-          {/* Quick Stage Transition Buttons */}
-          {allowedStatuses.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {allowedStatuses.map((target) => {
-                const isReject = target === "REJECTED";
-                return (
-                  <button
-                    key={target}
-                    type="button"
-                    onClick={() =>
-                      setStatusDialogState({ open: true, targetStatus: target })
-                    }
-                    className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
-                      isReject
-                        ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                        : "bg-brand text-white hover:bg-blue-700"
-                    }`}
-                  >
-                    {isReject
-                      ? "Reject Application"
-                      : `Move to ${APPLICATION_STATUS_META[target]?.label || target}`}
-                  </button>
-                );
-              })}
+          {/* Quick Stage & Interview Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            {["SUBMITTED", "UNDER_REVIEW", "SHORTLISTED", "INTERVIEW"].includes(
+              app.status
+            ) && (
+              <Link to={`/app/recruiter/interviews/new?applicationId=${app.id}`}>
+                <Button type="button" className="gap-1.5 py-2 text-xs">
+                  <CalendarPlus size={14} />
+                  Schedule Interview
+                </Button>
+              </Link>
+            )}
 
+            {["SHORTLISTED", "INTERVIEW", "OFFERED"].includes(app.status) && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="gap-1.5 py-2 text-xs"
+                onClick={() => setHiringDecisionOpen(true)}
+              >
+                <Award size={14} />
+                Hiring Decision
+              </Button>
+            )}
+
+            {allowedStatuses.length > 0 && (
               <Button
                 type="button"
                 variant="secondary"
@@ -261,14 +309,23 @@ export function RecruiterApplicationReviewPage() {
                 <SlidersHorizontal size={14} />
                 Update Status
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
       {/* Main Two-Column Review Workspace */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {/* Interview Rounds Section */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <InterviewRoundList
+              rounds={interviewRounds}
+              applicationId={app.id}
+              canManage={Boolean(app.myCompanyRole)}
+            />
+          </section>
+
           {/* Submitted Resume Viewer & Authorized Download */}
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between gap-2">
@@ -278,9 +335,9 @@ export function RecruiterApplicationReviewPage() {
                   Submitted Resume / CV
                 </h2>
               </div>
-              {app.resumeRecord?.version ? (
+              {app.resume?.version ? (
                 <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                  Version v{app.resumeRecord.version}
+                  Version v{app.resume.version}
                 </span>
               ) : null}
             </div>
@@ -347,13 +404,8 @@ export function RecruiterApplicationReviewPage() {
                         className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5"
                       >
                         <h4 className="font-semibold text-sm text-slate-900">
-                          {proj.title}
+                          {proj.title || proj.name}
                         </h4>
-                        {proj.role && (
-                          <p className="text-xs font-medium text-indigo-600">
-                            {proj.role}
-                          </p>
-                        )}
                         {proj.description && (
                           <p className="mt-1.5 text-xs text-slate-600">
                             {proj.description}
@@ -508,14 +560,6 @@ export function RecruiterApplicationReviewPage() {
                   </span>
                 </div>
               )}
-              {profile.preferredWorkMode && (
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Preferred Work Mode:</span>
-                  <span className="font-semibold text-slate-800">
-                    {profile.preferredWorkMode}
-                  </span>
-                </div>
-              )}
               <div className="flex justify-between">
                 <span className="text-slate-400">Applied Date:</span>
                 <span className="font-semibold text-slate-800">
@@ -533,11 +577,11 @@ export function RecruiterApplicationReviewPage() {
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {structuredSkills.map((sk) => (
                     <span
-                      key={sk.id || sk.name}
+                      key={sk.id || sk.name || sk}
                       className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand"
                     >
-                      {sk.name}
-                      {sk.experienceYears != null
+                      {typeof sk === "string" ? sk : sk.name}
+                      {sk?.experienceYears != null
                         ? ` (${sk.experienceYears}y)`
                         : ""}
                     </span>
@@ -571,10 +615,11 @@ export function RecruiterApplicationReviewPage() {
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {languages.map((lang) => (
                     <span
-                      key={lang.id || lang.language}
+                      key={lang.id || lang.name || lang.language}
                       className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
                     >
-                      {lang.language} ({lang.proficiency})
+                      {lang.name || lang.language} (
+                      {lang.proficiencyLevel || lang.proficiency})
                     </span>
                   ))}
                 </div>
@@ -651,6 +696,16 @@ export function RecruiterApplicationReviewPage() {
           setStatusDialogState({ open: false, targetStatus: "" })
         }
         onConfirm={(payload) => statusMutation.mutate(payload)}
+      />
+
+      <HiringDecisionDialog
+        open={hiringDecisionOpen}
+        candidateName={candidateName}
+        jobTitle={app.job?.title || app.jobSnapshot?.title}
+        currentApplicationStatus={app.status}
+        isPending={hiringDecisionMutation.isPending}
+        onClose={() => setHiringDecisionOpen(false)}
+        onConfirm={(payload) => hiringDecisionMutation.mutate(payload)}
       />
     </div>
   );

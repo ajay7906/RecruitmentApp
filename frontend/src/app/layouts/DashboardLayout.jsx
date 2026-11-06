@@ -8,6 +8,8 @@ import {
   Search,
   FileText,
   FileUp,
+  CalendarClock,
+  Award,
   LogOut,
   Menu,
 } from "lucide-react";
@@ -22,11 +24,18 @@ function getNavItems(role) {
   ];
 
   if (!role || role === "candidate") {
-    items.push({
-      to: "/app/resumes",
-      label: "My resumes",
-      icon: FileUp,
-    });
+    items.push(
+      {
+        to: "/app/resumes",
+        label: "My resumes",
+        icon: FileUp,
+      },
+      {
+        to: "/app/interviews",
+        label: "My interviews",
+        icon: CalendarClock,
+      }
+    );
   }
 
   if (role === "recruiter" || role === "admin") {
@@ -40,6 +49,16 @@ function getNavItems(role) {
         to: "/app/jobs/manage",
         label: "Job management",
         icon: BriefcaseBusiness,
+      },
+      {
+        to: "/app/recruiter/interviews",
+        label: "Interviews",
+        icon: CalendarClock,
+      },
+      {
+        to: "/app/recruiter/hiring",
+        label: "Hiring decisions",
+        icon: Award,
       }
     );
   }
