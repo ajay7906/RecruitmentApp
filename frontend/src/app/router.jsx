@@ -17,6 +17,13 @@ import { EditCompanyPage } from "../features/companies/pages/EditCompanyPage";
 import { CompanyApprovalPage } from "../features/companies/pages/CompanyApprovalPage";
 import { AdminCompaniesPage } from "../features/companies/pages/AdminCompaniesPage";
 import { JobsPage } from "../features/jobs/pages/JobsPage";
+import { PublicJobDetailsPage } from "../features/jobs/pages/PublicJobDetailsPage";
+import { JobDashboardPage } from "../features/jobs/pages/JobDashboardPage";
+import { MyJobsPage } from "../features/jobs/pages/MyJobsPage";
+import { CreateJobPage } from "../features/jobs/pages/CreateJobPage";
+import { EditJobPage } from "../features/jobs/pages/EditJobPage";
+import { RecruiterJobDetailsPage } from "../features/jobs/pages/RecruiterJobDetailsPage";
+import { JobApprovalStatusPage } from "../features/jobs/pages/JobApprovalStatusPage";
 import { ApplicationsPage } from "../features/applications/pages/ApplicationsPage";
 import { NotFoundPage } from "../features/misc/pages/NotFoundPage";
 import { useAuthStore } from "../stores/authStore";
@@ -37,6 +44,8 @@ export const router = createBrowserRouter([
       { path: "/login", element: <LoginPage /> },
       { path: "/register", element: <RegisterPage /> },
       { path: "/verify-email", element: <VerifyEmailPage /> },
+      { path: "/jobs", element: <JobsPage /> },
+      { path: "/jobs/:id", element: <PublicJobDetailsPage /> },
     ],
   },
   {
@@ -103,6 +112,58 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "jobs", element: <JobsPage /> },
+      {
+        path: "jobs/manage",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <JobDashboardPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "jobs/my",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <MyJobsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "jobs/new",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <CreateJobPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "jobs/:id",
+        element: <PublicJobDetailsPage />,
+      },
+      {
+        path: "jobs/:id/manage",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <RecruiterJobDetailsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "jobs/:id/edit",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <EditJobPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "jobs/:id/publishing",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <JobApprovalStatusPage />
+          </ProtectedRoute>
+        ),
+      },
       { path: "applications", element: <ApplicationsPage /> },
     ],
   },

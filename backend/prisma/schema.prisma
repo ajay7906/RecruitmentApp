@@ -56,6 +56,19 @@ enum CompanyMembershipStatus {
   @@map("company_membership_status")
 }
 
+enum JobStatus {
+  DRAFT
+  PENDING_APPROVAL
+  PUBLISHED
+  PAUSED
+  CLOSED
+  REJECTED
+  EXPIRED
+  ARCHIVED
+
+  @@map("job_status")
+}
+
 model User {
   id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email           String     @unique // zod already lowercases it; see README note about citext
@@ -74,6 +87,9 @@ model User {
   ownedCompanies     Company[]           @relation("CompanyOwner")
   approvedCompanies  Company[]           @relation("CompanyApprover")
   companyMemberships CompanyMembership[]
+  createdJobs        Job[]               @relation("JobCreator")
+  updatedJobs        Job[]               @relation("JobUpdater")
+  approvedJobs       Job[]               @relation("JobApprover")
 
   @@map("users")
 }
@@ -176,6 +192,7 @@ model Company {
   approvedBy  User?               @relation("CompanyApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   recruiters  RecruiterProfile[]
   memberships CompanyMembership[]
+  jobs        Job[]
 
   @@index([ownerId], map: "idx_companies_owner_id")
   @@index([status], map: "idx_companies_status")
@@ -215,4 +232,85 @@ model RecruiterProfile {
 
   @@index([companyId], map: "idx_recruiter_profiles_company_id")
   @@map("recruiter_profiles")
+}
+
+model Job {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                    String    @map("job_title")
+  companyId                String    @map("company_id") @db.Uuid
+  createdById              String    @map("created_by") @db.Uuid
+  updatedById              String?   @map("updated_by") @db.Uuid
+  approvedById             String?   @map("approved_by") @db.Uuid
+
+  department               String?
+  category                 String?   @map("job_category")
+  description              String    @map("job_description")
+  summary                  String?   @map("job_summary")
+  numberOfOpenings         Int       @default(1) @map("number_of_openings")
+  employmentType           String    @map("employment_type")
+  workMode                 String    @map("work_mode")
+
+  experienceLevel          String?   @map("experience_required")
+  minExperience            Decimal?  @default(0) @map("min_experience") @db.Decimal(4, 1)
+  maxExperience            Decimal?  @map("max_experience") @db.Decimal(4, 1)
+
+  minSalary                Decimal?  @map("min_salary") @db.Decimal(12, 2)
+  maxSalary                Decimal?  @map("max_salary") @db.Decimal(12, 2)
+  salaryCurrency           String    @default("INR") @map("salary_currency")
+  salaryPeriod             String    @default("Yearly") @map("salary_period")
+  discloseSalary           Boolean   @default(true) @map("disclose_salary")
+
+  country                  String?
+  state                    String?
+  city                     String?
+  officeLocation           String?   @map("office_location")
+  pincode                  String?
+  location                 String?
+
+  requiredSkills           String[]  @default([]) @map("required_skills")
+  preferredSkills          String[]  @default([]) @map("preferred_skills")
+  educationalQualification String?   @map("educational_qualification")
+  minEducationLevel        String?   @map("min_education_level")
+  preferredQualifications  String?   @map("preferred_qualifications")
+  requiredCertifications   String[]  @default([]) @map("required_certifications")
+  experienceDescription    String?   @map("experience_description")
+  additionalRequirements   String?   @map("additional_requirements")
+
+  responsibilities         String[]  @default([])
+  benefits                 String[]  @default([])
+  perks                    String[]  @default([])
+  additionalInfo           String?   @map("additional_info")
+  applicationInstructions  String?   @map("application_instructions")
+  contactEmail             String?   @map("contact_email")
+
+  applicationDeadline      DateTime? @map("application_deadline") @db.Timestamptz(6)
+  allowAfterDeadline       Boolean   @default(false) @map("allow_after_deadline")
+  requireResume            Boolean   @default(true) @map("require_resume")
+  requireCoverLetter       Boolean   @default(false) @map("require_cover_letter")
+  maxApplications          Int?      @map("max_applications")
+  applicationQuestions     Json      @default("[]") @map("application_questions")
+
+  status                   JobStatus @default(DRAFT)
+  requireAdminApproval     Boolean   @default(false) @map("require_admin_approval")
+  rejectionReason          String?   @map("rejection_reason")
+  submittedAt              DateTime? @map("submitted_at") @db.Timestamptz(6)
+  publishedAt              DateTime? @map("published_at") @db.Timestamptz(6)
+  pausedAt                 DateTime? @map("paused_at") @db.Timestamptz(6)
+  closedAt                 DateTime? @map("closed_at") @db.Timestamptz(6)
+  archivedAt               DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy  User    @relation("JobCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy  User?   @relation("JobUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  approvedBy User?   @relation("JobApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([companyId], map: "idx_jobs_company_id")
+  @@index([createdById], map: "idx_jobs_created_by")
+  @@index([status], map: "idx_jobs_status")
+  @@index([employmentType], map: "idx_jobs_employment_type")
+  @@index([workMode], map: "idx_jobs_work_mode")
+  @@index([publishedAt], map: "idx_jobs_published_at")
+  @@map("jobs")
 }

@@ -21,11 +21,18 @@ function getNavItems(role) {
   ];
 
   if (role === "recruiter" || role === "admin") {
-    items.push({
-      to: "/app/companies",
-      label: "My companies",
-      icon: Building2,
-    });
+    items.push(
+      {
+        to: "/app/companies",
+        label: "My companies",
+        icon: Building2,
+      },
+      {
+        to: "/app/jobs/manage",
+        label: "Job management",
+        icon: BriefcaseBusiness,
+      }
+    );
   }
 
   if (role === "admin") {
@@ -37,7 +44,7 @@ function getNavItems(role) {
   }
 
   items.push(
-    { to: "/app/jobs", label: "Find jobs", icon: Search },
+    { to: "/app/jobs", label: "Find jobs", icon: Search, end: true },
     { to: "/app/applications", label: "Applications", icon: FileText }
   );
 
@@ -74,10 +81,11 @@ export function DashboardLayout() {
           Workspace
         </p>
         <nav className="space-y-1">
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {navItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
+              end={end}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${

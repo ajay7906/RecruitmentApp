@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Crown,
+  Plus,
 } from "lucide-react";
 
 import { companiesApi } from "../api/companiesApi";
@@ -301,7 +302,7 @@ export function CompanyDashboardPage() {
         </div>
       </div>
 
-      {/* ── Secondary Grid: Missing Completion Checklist & Active Jobs Checkpoint ── */}
+      {/* ── Secondary Grid: Missing Completion Checklist & Active Jobs ── */}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Profile Completion & Ownership Summary */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -367,31 +368,36 @@ export function CompanyDashboardPage() {
           )}
         </section>
 
-        {/* Active Jobs Integration Section (No fake statistics) */}
-        <section className="flex flex-col justify-between rounded-2xl border border-dashed border-slate-300 bg-white p-6">
+        {/* Active Jobs Integration Section */}
+        <section className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-brand">
-                <BriefcaseBusiness size={20} />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-brand">
+                  <BriefcaseBusiness size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Active Jobs
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Published openings for {company.name}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Active Jobs
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Job module integration slot
-                </p>
-              </div>
+              <span className="rounded-xl bg-emerald-50 px-3.5 py-1.5 text-lg font-bold text-emerald-700">
+                {company.activeJobsCount ?? 0}
+              </span>
             </div>
             <p className="mt-4 text-sm leading-6 text-slate-600">
-              Job postings and active requisition metrics will appear here once
-              the Job Management module is connected. Only{" "}
+              Create, publish, pause, or manage job openings associated with{" "}
+              <span className="font-semibold text-slate-800">{company.name}</span>. Only{" "}
               <span className="font-semibold text-slate-800">APPROVED</span>{" "}
-              companies will be eligible to publish live job openings.
+              companies are eligible to publish live vacancies to candidates.
             </p>
           </div>
 
-          <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-xs text-slate-500">
             <span>
               Eligibility:{" "}
               {company.status === "APPROVED" ? (
@@ -402,12 +408,20 @@ export function CompanyDashboardPage() {
                 </strong>
               )}
             </span>
-            <Link
-              to="/app/jobs"
-              className="font-semibold text-brand hover:underline"
-            >
-              Go to Jobs →
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                to={`/app/jobs/new?companyId=${company.id}`}
+                className="inline-flex items-center gap-1 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+              >
+                <Plus size={13} /> Post Job
+              </Link>
+              <Link
+                to="/app/jobs/manage"
+                className="font-semibold text-brand hover:underline"
+              >
+                Manage Jobs →
+              </Link>
+            </div>
           </div>
         </section>
       </div>

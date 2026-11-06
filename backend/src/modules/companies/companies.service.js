@@ -79,6 +79,7 @@ function formatCompany(company, currentUser) {
   const membershipCount = company._count?.memberships ?? (company.memberships ? company.memberships.length : 0);
   const recruiterProfileCount = company._count?.recruiters ?? 0;
   const recruiterCount = Math.max(membershipCount, recruiterProfileCount, company.ownerId ? 1 : 0);
+  const activeJobsCount = company._count?.jobs ?? 0;
 
   return {
     ...company,
@@ -89,6 +90,7 @@ function formatCompany(company, currentUser) {
     canManage,
     canManageOwnership,
     recruiterCount,
+    activeJobsCount,
     completion: computeCompletion(company),
   };
 }

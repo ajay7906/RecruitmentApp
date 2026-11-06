@@ -33,6 +33,7 @@ const companyDetailInclude = {
     select: {
       memberships: { where: { membershipStatus: 'ACTIVE' } },
       recruiters: true,
+      jobs: { where: { status: 'PUBLISHED' } },
     },
   },
 };
@@ -53,6 +54,7 @@ const companyListInclude = {
     select: {
       memberships: { where: { membershipStatus: 'ACTIVE' } },
       recruiters: true,
+      jobs: { where: { status: 'PUBLISHED' } },
     },
   },
 };
