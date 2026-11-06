@@ -5,5 +5,7 @@ router.use('/auth', require('./modules/auth/auth.routes'));
 router.use('/profile', require('./modules/profile/profile.routes'));
 router.use('/companies', require('./modules/companies/companies.routes'));
 router.use('/jobs', require('./modules/jobs/jobs.routes'));
+router.use('/applications', require('./modules/applications/applications.routes'));
+router.use('/recruiter/applications', require('./modules/applications/recruiterApplications.routes'));
 
 module.exports = router;

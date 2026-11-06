@@ -13,13 +13,6 @@ function getDashboardCards(role) {
   if (role === "recruiter") {
     return [
       {
-        label: "Recruiter Profile",
-        value: "Keep it current",
-        icon: UserRound,
-        to: "/app/profile",
-        note: "Manage your personal recruiter details and company link.",
-      },
-      {
         label: "Company Management",
         value: "Manage your companies",
         icon: Building2,
@@ -27,11 +20,18 @@ function getDashboardCards(role) {
         note: "Register companies, manage team members, and track approval status.",
       },
       {
-        label: "Jobs Workspace",
-        value: "Hiring pipeline",
+        label: "Job Management",
+        value: "Create & publish jobs",
         icon: BriefcaseBusiness,
-        to: "/app/jobs",
-        note: "Review and manage job postings across your organization.",
+        to: "/app/jobs/manage",
+        note: "Create, publish, pause, and monitor job postings across your companies.",
+      },
+      {
+        label: "Candidate Applications",
+        value: "Review applicants",
+        icon: FileCheck2,
+        to: "/app/recruiter/applications",
+        note: "Screen resumes, update candidate stages, and record hiring notes.",
       },
     ];
   }
@@ -46,43 +46,43 @@ function getDashboardCards(role) {
         note: "Approve, reject, or suspend company registrations.",
       },
       {
-        label: "Company Directory",
-        value: "Manage companies",
-        icon: Building2,
-        to: "/app/companies",
-        note: "Browse and manage registered companies.",
+        label: "Job Management",
+        value: "Platform job listings",
+        icon: BriefcaseBusiness,
+        to: "/app/jobs/manage",
+        note: "Monitor and manage job openings across organizations.",
       },
       {
-        label: "Explore Jobs",
-        value: "Platform listings",
-        icon: BriefcaseBusiness,
-        to: "/app/jobs",
-        note: "Monitor active job opportunities.",
+        label: "All Applications",
+        value: "Platform applications",
+        icon: FileCheck2,
+        to: "/app/recruiter/applications",
+        note: "Monitor candidate applications and status pipelines.",
       },
     ];
   }
 
   return [
     {
-      label: "Profile",
+      label: "Profile & Resume",
       value: "Keep it current",
       icon: UserRound,
       to: "/app/profile",
-      note: "Help employers understand your experience.",
+      note: "Help employers understand your skills and experience.",
     },
     {
-      label: "Explore jobs",
+      label: "Explore Jobs",
       value: "Find your next step",
       icon: BriefcaseBusiness,
       to: "/app/jobs",
-      note: "Review opportunities that fit your goals.",
+      note: "Browse published opportunities and apply online.",
     },
     {
-      label: "Applications",
+      label: "My Applications",
       value: "Track your progress",
       icon: FileCheck2,
       to: "/app/applications",
-      note: "Keep your job search organized.",
+      note: "View application timelines, status updates, and submitted documents.",
     },
   ];
 }
@@ -125,14 +125,14 @@ export function DashboardPage() {
           </Link>
         ))}
       </div>
-      <div className="mt-7 rounded-2xl border border-dashed border-slate-300 bg-white p-6">
+      <div className="mt-7 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
         <h2 className="font-semibold text-slate-900">
-          Backend integration checkpoint
+          End-to-End Recruitment Pipeline Active
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Authentication, Candidate Profile, Recruiter Profile, and Company
-          Management modules are live and connected. Connect Job Postings and
-          Applications next to complete the hiring pipeline.
+          Authentication, Candidate Profile, Recruiter Profile, Company
+          Management, Job Management, and Job Application Management modules are
+          connected and active.
         </p>
       </div>
     </div>

@@ -10,6 +10,14 @@ router.use(authenticate);
 // candidate
 router.get('/candidate/me', requireRole('candidate'), c.getCandidate);
 router.put('/candidate/me', requireRole('candidate'), validate(v.updateCandidate), c.updateCandidate);
+router.put(
+  '/candidate/me/resume',
+  requireRole('candidate'),
+  validate(v.uploadCandidateResume),
+  c.uploadCandidateResume
+);
+router.get('/candidate/me/resume', requireRole('candidate'), c.getCandidateResume);
+router.delete('/candidate/me/resume', requireRole('candidate'), c.deleteCandidateResume);
 
 // recruiter
 router.get('/recruiter/me', requireRole('recruiter'), c.getRecruiter);

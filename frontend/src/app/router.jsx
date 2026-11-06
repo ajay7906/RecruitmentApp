@@ -25,6 +25,11 @@ import { EditJobPage } from "../features/jobs/pages/EditJobPage";
 import { RecruiterJobDetailsPage } from "../features/jobs/pages/RecruiterJobDetailsPage";
 import { JobApprovalStatusPage } from "../features/jobs/pages/JobApprovalStatusPage";
 import { ApplicationsPage } from "../features/applications/pages/ApplicationsPage";
+import { MyApplicationsPage } from "../features/applications/pages/MyApplicationsPage";
+import { JobApplicationPage } from "../features/applications/pages/JobApplicationPage";
+import { CandidateApplicationDetailsPage } from "../features/applications/pages/CandidateApplicationDetailsPage";
+import { RecruiterApplicationsDashboardPage } from "../features/applications/pages/RecruiterApplicationsDashboardPage";
+import { RecruiterApplicationReviewPage } from "../features/applications/pages/RecruiterApplicationReviewPage";
 import { NotFoundPage } from "../features/misc/pages/NotFoundPage";
 import { useAuthStore } from "../stores/authStore";
 
@@ -141,6 +146,14 @@ export const router = createBrowserRouter([
         element: <PublicJobDetailsPage />,
       },
       {
+        path: "jobs/:id/apply",
+        element: (
+          <ProtectedRoute allowedRoles={["candidate"]}>
+            <JobApplicationPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: "jobs/:id/manage",
         element: (
           <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
@@ -165,6 +178,38 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "applications", element: <ApplicationsPage /> },
+      {
+        path: "applications/my",
+        element: (
+          <ProtectedRoute allowedRoles={["candidate"]}>
+            <MyApplicationsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "applications/:id",
+        element: (
+          <ProtectedRoute allowedRoles={["candidate"]}>
+            <CandidateApplicationDetailsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "recruiter/applications",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <RecruiterApplicationsDashboardPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "recruiter/applications/:id",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <RecruiterApplicationReviewPage />
+          </ProtectedRoute>
+        ),
+      },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

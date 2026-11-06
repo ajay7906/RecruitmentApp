@@ -2,18 +2,94 @@ const prisma = require('../../config/prisma');
 const ApiError = require('../../utils/ApiError');
 const repo = require('./profile.repository');
 const companiesRepo = require('../companies/companies.repository');
+const resumeStorage = require('../../services/resumeStorage.service');
 
 const withTransaction = (fn) => prisma.$transaction(fn);
+
+function sanitizeCandidateProfileResponse(profile) {
+  if (!profile) return null;
+  const { resumeKey, ...rest } = profile;
+  return {
+    ...rest,
+    hasResume: Boolean(resumeKey),
+  };
+}
 
 // Candidate
 exports.getCandidateProfile = async (userId) => {
   const profile = await repo.findCandidateById(userId);
-  if (profile) return profile;
+  if (profile) return sanitizeCandidateProfileResponse(profile);
   const user = await repo.findUserById(userId);
-  return { user };
+  return { user, hasResume: false, skills: [] };
 };
 
-exports.updateCandidateProfile = (userId, data) => repo.upsertCandidate(userId, data);
+exports.updateCandidateProfile = async (userId, { resumeUpload, ...data }) => {
+  const updatePayload = { ...data };
+
+  if (resumeUpload) {
+    const stored = await resumeStorage.saveResumeFile({
+      userId,
+      fileName: resumeUpload.fileName,
+      mimeType: resumeUpload.mimeType,
+      contentBase64: resumeUpload.contentBase64,
+    });
+    updatePayload.resumeKey = stored.resumeKey;
+    updatePayload.resumeFileName = stored.resumeFileName;
+    updatePayload.resumeMimeType = stored.resumeMimeType;
+    updatePayload.resumeFileSize = stored.resumeFileSize;
+    updatePayload.resumeUpdatedAt = new Date();
+  }
+
+  const updated = await repo.upsertCandidate(userId, updatePayload);
+  return sanitizeCandidateProfileResponse(updated);
+};
+
+exports.uploadCandidateResume = async (userId, resumePayload) => {
+  const stored = await resumeStorage.saveResumeFile({
+    userId,
+    fileName: resumePayload.fileName,
+    mimeType: resumePayload.mimeType,
+    contentBase64: resumePayload.contentBase64,
+  });
+
+  const updated = await repo.upsertCandidate(userId, {
+    resumeKey: stored.resumeKey,
+    resumeFileName: stored.resumeFileName,
+    resumeMimeType: stored.resumeMimeType,
+    resumeFileSize: stored.resumeFileSize,
+    resumeUpdatedAt: new Date(),
+  });
+
+  return sanitizeCandidateProfileResponse(updated);
+};
+
+exports.deleteCandidateResume = async (userId) => {
+  const profile = await repo.findCandidateById(userId);
+  if (profile?.resumeKey) {
+    await resumeStorage.deleteResumeFileIfExists(profile.resumeKey);
+  }
+  const updated = await repo.upsertCandidate(userId, {
+    resumeKey: null,
+    resumeFileName: null,
+    resumeMimeType: null,
+    resumeFileSize: null,
+    resumeUpdatedAt: null,
+  });
+  return sanitizeCandidateProfileResponse(updated);
+};
+
+exports.getCandidateResumeStream = async (userId) => {
+  const profile = await repo.findCandidateById(userId);
+  if (!profile || !profile.resumeKey) {
+    throw new ApiError(404, 'No resume uploaded on your profile yet', 'RESUME_NOT_FOUND');
+  }
+  const fileData = await resumeStorage.readResumeFile(profile.resumeKey);
+  return {
+    buffer: fileData.buffer,
+    mimeType: profile.resumeMimeType || fileData.mimeType,
+    fileName: profile.resumeFileName || 'resume.pdf',
+  };
+};
 
 // Recruiter
 exports.getRecruiterProfile = async (userId) => {

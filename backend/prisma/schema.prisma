@@ -69,6 +69,19 @@ enum JobStatus {
   @@map("job_status")
 }
 
+enum ApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  SHORTLISTED
+  INTERVIEW
+  OFFERED
+  HIRED
+  REJECTED
+  WITHDRAWN
+
+  @@map("application_status")
+}
+
 model User {
   id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email           String     @unique // zod already lowercases it; see README note about citext
@@ -80,16 +93,19 @@ model User {
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  authTokens         AuthToken[]
-  refreshTokens      RefreshToken[]
-  candidateProfile   CandidateProfile?
-  recruiterProfile   RecruiterProfile?
-  ownedCompanies     Company[]           @relation("CompanyOwner")
-  approvedCompanies  Company[]           @relation("CompanyApprover")
-  companyMemberships CompanyMembership[]
-  createdJobs        Job[]               @relation("JobCreator")
-  updatedJobs        Job[]               @relation("JobUpdater")
-  approvedJobs       Job[]               @relation("JobApprover")
+  authTokens                AuthToken[]
+  refreshTokens             RefreshToken[]
+  candidateProfile          CandidateProfile?
+  recruiterProfile          RecruiterProfile?
+  ownedCompanies            Company[]                  @relation("CompanyOwner")
+  approvedCompanies         Company[]                  @relation("CompanyApprover")
+  companyMemberships        CompanyMembership[]
+  createdJobs               Job[]                      @relation("JobCreator")
+  updatedJobs               Job[]                      @relation("JobUpdater")
+  approvedJobs              Job[]                      @relation("JobApprover")
+  candidateApplications     Application[]              @relation("CandidateApplications")
+  reviewedApplications      Application[]              @relation("RecruiterReviewedApplications")
+  applicationStatusChanges  ApplicationStatusHistory[] @relation("ApplicationStatusChangedBy")
 
   @@map("users")
 }
@@ -145,6 +161,12 @@ model CandidateProfile {
   yearsOfExperience Decimal?  @map("years_of_experience") @db.Decimal(4, 1)
   currentJobTitle   String?   @map("current_job_title")
   currentCompany    String?   @map("current_company")
+  skills            String[]  @default([])
+  resumeKey         String?   @map("resume_key")
+  resumeFileName    String?   @map("resume_file_name")
+  resumeMimeType    String?   @map("resume_mime_type")
+  resumeFileSize    Int?      @map("resume_file_size")
+  resumeUpdatedAt   DateTime? @map("resume_updated_at") @db.Timestamptz(6)
   linkedinUrl       String?   @map("linkedin_url")
   githubUrl         String?   @map("github_url")
   portfolioUrl      String?   @map("portfolio_url")
@@ -188,11 +210,12 @@ model Company {
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  owner       User?               @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  approvedBy  User?               @relation("CompanyApprover", fields: [approvedById], references: [id], onDelete: SetNull)
-  recruiters  RecruiterProfile[]
-  memberships CompanyMembership[]
-  jobs        Job[]
+  owner        User?               @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  approvedBy   User?               @relation("CompanyApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  recruiters   RecruiterProfile[]
+  memberships  CompanyMembership[]
+  jobs         Job[]
+  applications Application[]
 
   @@index([ownerId], map: "idx_companies_owner_id")
   @@index([status], map: "idx_companies_status")
@@ -301,10 +324,11 @@ model Job {
   createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdBy  User    @relation("JobCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy  User?   @relation("JobUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
-  approvedBy User?   @relation("JobApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy    User          @relation("JobCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy    User?         @relation("JobUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  approvedBy   User?         @relation("JobApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  applications Application[]
 
   @@index([companyId], map: "idx_jobs_company_id")
   @@index([createdById], map: "idx_jobs_created_by")
@@ -313,4 +337,70 @@ model Job {
   @@index([workMode], map: "idx_jobs_work_mode")
   @@index([publishedAt], map: "idx_jobs_published_at")
   @@map("jobs")
+}
+
+model Application {
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId                 String            @map("job_id") @db.Uuid
+  candidateId           String            @map("candidate_id") @db.Uuid
+  companyId             String            @map("company_id") @db.Uuid
+  reviewedById          String?           @map("reviewed_by") @db.Uuid
+
+  resumeKey             String?           @map("resume_key")
+  resumeFileName        String?           @map("resume_file_name")
+  resumeMimeType        String?           @map("resume_mime_type")
+  resumeFileSize        Int?              @map("resume_file_size")
+
+  coverLetter           String?           @map("cover_letter")
+  answers               Json              @default("[]")
+  additionalInformation String?           @map("additional_information")
+
+  candidateSkills       String[]          @default([]) @map("candidate_skills")
+  candidateExperience   Decimal?          @map("candidate_experience") @db.Decimal(4, 1)
+  candidateSnapshot     Json              @default("{}") @map("candidate_snapshot")
+  jobSnapshot           Json              @default("{}") @map("job_snapshot")
+
+  status                ApplicationStatus @default(SUBMITTED)
+  appliedAt             DateTime          @default(now()) @map("applied_at") @db.Timestamptz(6)
+  lastStatusUpdatedAt   DateTime          @default(now()) @map("last_status_updated_at") @db.Timestamptz(6)
+  withdrawnAt           DateTime?         @map("withdrawn_at") @db.Timestamptz(6)
+  withdrawalReason      String?           @map("withdrawal_reason")
+  rejectionReason       String?           @map("rejection_reason")
+  recruiterNotes        Json              @default("[]") @map("recruiter_notes")
+
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  job           Job                        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate     User                       @relation("CandidateApplications", fields: [candidateId], references: [id], onDelete: Cascade)
+  company       Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reviewedBy    User?                      @relation("RecruiterReviewedApplications", fields: [reviewedById], references: [id], onDelete: SetNull)
+  statusHistory ApplicationStatusHistory[]
+
+  @@unique([jobId, candidateId], map: "uq_applications_job_candidate")
+  @@index([candidateId], map: "idx_applications_candidate_id")
+  @@index([jobId], map: "idx_applications_job_id")
+  @@index([companyId], map: "idx_applications_company_id")
+  @@index([status], map: "idx_applications_status")
+  @@index([appliedAt], map: "idx_applications_applied_at")
+  @@map("applications")
+}
+
+model ApplicationStatusHistory {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId  String             @map("application_id") @db.Uuid
+  previousStatus ApplicationStatus? @map("previous_status")
+  newStatus      ApplicationStatus  @map("new_status")
+  changedById    String?            @map("changed_by") @db.Uuid
+  changedByRole  String             @map("changed_by_role")
+  reason         String?
+  notes          String?
+  changedAt      DateTime           @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  changedBy   User?       @relation("ApplicationStatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([applicationId], map: "idx_app_status_history_application_id")
+  @@index([changedAt], map: "idx_app_status_history_changed_at")
+  @@map("application_status_history")
 }

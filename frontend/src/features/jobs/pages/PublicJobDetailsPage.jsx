@@ -5,18 +5,19 @@ import {
   ArrowLeft,
   Building2,
   MapPin,
-  BriefcaseBusiness,
   Clock,
   Wallet,
   Users2,
-  Calendar,
   CheckCircle2,
   Globe,
   Send,
   FileCheck2,
+  Eye,
 } from "lucide-react";
 
 import { jobsApi } from "../api/jobsApi";
+import { applicationsApi } from "../../applications/api/applicationsApi";
+import { ApplicationStatusBadge } from "../../applications/components/ApplicationStatusBadge";
 import { formatSalaryRange, formatExperienceRange } from "../schema/jobSchemas";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { ErrorState } from "../../../components/feedback/ErrorState";
@@ -35,6 +36,13 @@ export function PublicJobDetailsPage() {
   const query = useQuery({
     queryKey: ["jobs", "public-detail", id],
     queryFn: () => jobsApi.getPublicById(id),
+    retry: false,
+  });
+
+  const checkAppQuery = useQuery({
+    queryKey: ["applications", "check", id],
+    queryFn: () => applicationsApi.checkJobApplication(id),
+    enabled: Boolean(user && user.role === "candidate"),
     retry: false,
   });
 
@@ -57,6 +65,10 @@ export function PublicJobDetailsPage() {
   const job = query.data?.data?.job ?? query.data?.job;
   if (!job) return null;
 
+  const existingAppData = checkAppQuery.data?.data ?? checkAppQuery.data ?? {};
+  const hasApplied = Boolean(existingAppData.hasApplied);
+  const existingApplication = existingAppData.application || null;
+
   const locationDisplay =
     [job.city, job.state, job.country].filter(Boolean).join(", ") ||
     job.location ||
@@ -65,17 +77,18 @@ export function PublicJobDetailsPage() {
   function handleApplyClick() {
     if (!user) {
       toast.info("Please sign in as a candidate to apply for this position.");
-      navigate("/login", { state: { from: locationObj } });
+      navigate("/login", { state: { from: { pathname: `/app/jobs/${id}/apply` } } });
       return;
     }
     if (user.role !== "candidate") {
       toast.info("Only candidate accounts can submit job applications.");
       return;
     }
-    toast.info(
-      "Application configuration verified! Connect the Application Management module to submit your application."
-    );
-    navigate("/app/applications");
+    if (hasApplied && existingApplication) {
+      navigate(`/app/applications/${existingApplication.id}`);
+      return;
+    }
+    navigate(`/app/jobs/${id}/apply`);
   }
 
   return (
@@ -120,19 +133,42 @@ export function PublicJobDetailsPage() {
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            <Button
-              type="button"
-              disabled={!job.canApply}
-              onClick={handleApplyClick}
-              className="gap-2 px-6 py-3"
-            >
-              <Send size={16} />
-              {job.canApply ? "Apply Now" : "Applications Closed"}
-            </Button>
-            {job.applicationDeadline && (
-              <p className="text-xs text-slate-500">
-                Apply by {formatDate(job.applicationDeadline)}
-              </p>
+            {hasApplied && existingApplication ? (
+              <div className="flex flex-col items-end gap-1.5">
+                <div className="flex items-center gap-2">
+                  <ApplicationStatusBadge
+                    status={existingApplication.status}
+                    size="sm"
+                  />
+                  <Link
+                    to={`/app/applications/${existingApplication.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                  >
+                    <Eye size={16} />
+                    View My Application
+                  </Link>
+                </div>
+                <p className="text-xs text-emerald-700 font-medium">
+                  Applied on {formatDate(existingApplication.appliedAt)}
+                </p>
+              </div>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  disabled={!job.canApply}
+                  onClick={handleApplyClick}
+                  className="gap-2 px-6 py-3"
+                >
+                  <Send size={16} />
+                  {job.canApply ? "Apply Now" : "Applications Closed"}
+                </Button>
+                {job.applicationDeadline && (
+                  <p className="text-xs text-slate-500">
+                    Apply by {formatDate(job.applicationDeadline)}
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>

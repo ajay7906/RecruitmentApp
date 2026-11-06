@@ -21,6 +21,14 @@ const phone = z
   .nullable()
   .optional();
 
+const resumeUploadSchema = z
+  .object({
+    fileName: z.string().trim().min(1).max(255),
+    mimeType: z.string().trim().max(120).optional(),
+    contentBase64: z.string().min(10, 'Resume content is required'),
+  })
+  .strict();
+
 // PATCH-style: every field optional, unknown fields rejected
 exports.updateCandidate = z.object({
   body: z
@@ -50,11 +58,20 @@ exports.updateCandidate = z.object({
       ),
       currentJobTitle: optionalText(100),
       currentCompany: optionalText(100),
+      skills: z
+        .array(z.string().trim().min(1).max(80))
+        .max(50, 'Maximum 50 skills allowed')
+        .optional(),
       linkedinUrl: optionalUrl,
       githubUrl: optionalUrl,
       portfolioUrl: optionalUrl,
+      resumeUpload: resumeUploadSchema.nullable().optional(),
     })
     .strict(),
+});
+
+exports.uploadCandidateResume = z.object({
+  body: resumeUploadSchema,
 });
 
 exports.updateRecruiter = z.object({
