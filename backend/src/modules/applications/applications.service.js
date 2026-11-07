@@ -3,6 +3,7 @@ const ApiError = require('../../utils/ApiError');
 const repo = require('./applications.repository');
 const jobsRepo = require('../jobs/jobs.repository');
 const resumeStorage = require('../../services/resumeStorage.service');
+const { resolveUserPermissions } = require('../admin/admin.permissions');
 
 const ALLOWED_RECRUITER_TRANSITIONS = {
   SUBMITTED: ['UNDER_REVIEW', 'SHORTLISTED', 'REJECTED'],
@@ -951,6 +952,17 @@ exports.getApplicationResumeStream = async (currentUser, applicationId) => {
         403,
         'You are not authorized to access this resume',
         'FORBIDDEN_RESUME_ACCESS'
+      );
+    }
+  } else if (currentUser.role === 'admin') {
+    const perms = Array.isArray(currentUser.permissions)
+      ? currentUser.permissions
+      : await resolveUserPermissions(currentUser.id, currentUser.adminRole || 'ADMIN');
+    if (!perms.includes('applications.read_resume')) {
+      throw new ApiError(
+        403,
+        'Missing required permission: applications.read_resume',
+        'INSUFFICIENT_PERMISSIONS'
       );
     }
   } else {

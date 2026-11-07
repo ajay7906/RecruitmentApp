@@ -520,6 +520,18 @@ exports.createJobReport = async ({ jobId, reporterId, category, details }, db = 
       },
     });
 
+    await tx.report.create({
+      data: {
+        reportedBy: reporterId,
+        entityType: 'JOB',
+        entityId: jobId,
+        reason: category,
+        description: details || null,
+        status: 'OPEN',
+        legacyJobReportId: report.id,
+      },
+    });
+
     const updatedJob = await tx.job.update({
       where: { id: jobId },
       data: {

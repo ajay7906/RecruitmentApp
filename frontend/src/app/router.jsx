@@ -1,7 +1,9 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { DashboardLayout } from "./layouts/DashboardLayout";
+import { AdminLayout } from "./layouts/AdminLayout";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
+import { AdminRoute } from "./routes/AdminRoute";
 import { HomePage } from "../features/home/pages/HomePage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { RegisterPage } from "../features/auth/pages/RegisterPage";
@@ -40,6 +42,21 @@ import { HiringDashboardPage } from "../features/interviews/pages/HiringDashboar
 import { MyInterviewsPage } from "../features/interviews/pages/MyInterviewsPage";
 import { CandidateInterviewDetailsPage } from "../features/interviews/pages/CandidateInterviewDetailsPage";
 import { NotFoundPage } from "../features/misc/pages/NotFoundPage";
+import { AdminDashboardPage } from "../features/admin/pages/AdminDashboardPage";
+import { AdminUsersPage } from "../features/admin/pages/AdminUsersPage";
+import { AdminUserDetailsPage } from "../features/admin/pages/AdminUserDetailsPage";
+import { AdminCompaniesListPage } from "../features/admin/pages/AdminCompaniesListPage";
+import { AdminCompanyDetailsPage } from "../features/admin/pages/AdminCompanyDetailsPage";
+import { AdminJobsListPage } from "../features/admin/pages/AdminJobsListPage";
+import { AdminJobDetailsPage } from "../features/admin/pages/AdminJobDetailsPage";
+import { AdminApplicationsPage } from "../features/admin/pages/AdminApplicationsPage";
+import { AdminActivitiesPage } from "../features/admin/pages/AdminActivitiesPage";
+import { AdminAuditLogsPage } from "../features/admin/pages/AdminAuditLogsPage";
+import { AdminReportsPage } from "../features/admin/pages/AdminReportsPage";
+import { AdminAnalyticsPage } from "../features/admin/pages/AdminAnalyticsPage";
+import { AdminAdministratorsPage } from "../features/admin/pages/AdminAdministratorsPage";
+import { AdminPermissionsPage } from "../features/admin/pages/AdminPermissionsPage";
+import { AdminSettingsPage } from "../features/admin/pages/AdminSettingsPage";
 import { useAuthStore } from "../stores/authStore";
 
 function RoleBasedProfilePage() {
@@ -60,6 +77,139 @@ export const router = createBrowserRouter([
       { path: "/verify-email", element: <VerifyEmailPage /> },
       { path: "/jobs", element: <JobsPage /> },
       { path: "/jobs/:id", element: <PublicJobDetailsPage /> },
+    ],
+  },
+  {
+    path: "/admin",
+    element: (
+      <AdminRoute>
+        <AdminLayout />
+      </AdminRoute>
+    ),
+    children: [
+      { index: true, element: <Navigate to="dashboard" replace /> },
+      { path: "dashboard", element: <AdminDashboardPage /> },
+      {
+        path: "users",
+        element: (
+          <AdminRoute requiredPermission="users.read">
+            <AdminUsersPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "users/:id",
+        element: (
+          <AdminRoute requiredPermission="users.read">
+            <AdminUserDetailsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "companies",
+        element: (
+          <AdminRoute requiredPermission="companies.read">
+            <AdminCompaniesListPage approvalsOnly={false} />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "companies/approvals",
+        element: (
+          <AdminRoute requiredPermission="companies.read">
+            <AdminCompaniesListPage approvalsOnly={true} />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "companies/:id",
+        element: (
+          <AdminRoute requiredPermission="companies.read">
+            <AdminCompanyDetailsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "jobs",
+        element: (
+          <AdminRoute requiredPermission="jobs.read">
+            <AdminJobsListPage approvalsOnly={false} />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "jobs/approvals",
+        element: (
+          <AdminRoute requiredPermission="jobs.read">
+            <AdminJobsListPage approvalsOnly={true} />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "jobs/:id",
+        element: (
+          <AdminRoute requiredPermission="jobs.read">
+            <AdminJobDetailsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "applications",
+        element: (
+          <AdminRoute requiredPermission="applications.read">
+            <AdminApplicationsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "activities",
+        element: (
+          <AdminRoute requiredPermission="activities.read">
+            <AdminActivitiesPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "audit-logs",
+        element: (
+          <AdminRoute requiredPermission="audit_logs.read">
+            <AdminAuditLogsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "reports",
+        element: (
+          <AdminRoute requiredPermission="reports.read">
+            <AdminReportsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "analytics",
+        element: (
+          <AdminRoute requiredPermission="analytics.read">
+            <AdminAnalyticsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "administrators",
+        element: (
+          <AdminRoute requiredPermission="admins.read">
+            <AdminAdministratorsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "permissions",
+        element: (
+          <AdminRoute requiredPermission="admins.read">
+            <AdminPermissionsPage />
+          </AdminRoute>
+        ),
+      },
+      { path: "settings", element: <AdminSettingsPage /> },
     ],
   },
   {

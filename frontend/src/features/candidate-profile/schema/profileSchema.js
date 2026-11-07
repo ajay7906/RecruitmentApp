@@ -173,3 +173,10 @@ export const profileSchema = z.object({
   githubUrl: optionalUrl,
   portfolioUrl: optionalUrl,
 });
+
+export const PROFICIENCY_LEVELS = SKILL_PROFICIENCY_LEVELS;
+export const PREFERRED_EMPLOYMENT_TYPES = EMPLOYMENT_TYPES;
+export const PREFERRED_WORK_MODES = WORK_MODES;
+export const LANGUAGE_PROFICIENCIES = LANGUAGE_PROFICIENCY_LEVELS;
+export const EMPLOYMENT_STATUS_OPTIONS = EMPLOYMENT_STATUSES;
+export const NOTICE_PERIOD_OPTIONS = NOTICE_PERIODS;

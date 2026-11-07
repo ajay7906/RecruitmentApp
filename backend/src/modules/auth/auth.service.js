@@ -7,6 +7,7 @@ const ApiError = require('../../utils/ApiError');
 const { randomToken, sha256 } = require('../../utils/crypto');
 const repo = require('./auth.repository');
 const mail = require('../../services/email.service');
+const { resolveUserPermissions } = require('../admin/admin.permissions');
 
 const HOUR = 60 * 60 * 1000;
 // Runs fn(tx) in one DB transaction; rolls back automatically if fn throws.
@@ -14,16 +15,23 @@ const withTransaction = (fn) => prisma.$transaction(fn);
 
 const DUMMY_HASH = bcrypt.hashSync('dummy-password', 12); // equalises timing for unknown emails
 
-const publicUser = (u) => ({
+const publicUser = (u, extra = {}) => ({
   id: u.id,
   email: u.email,
   fullName: u.fullName,
   role: u.role,
+  adminRole: u.adminRole || null,
+  status: u.status || 'active',
   emailVerified: !!u.emailVerifiedAt,
+  ...extra,
 });
 
 const signAccessToken = (user) =>
-  jwt.sign({ role: user.role }, env.JWT_ACCESS_SECRET, { subject: user.id, expiresIn: env.ACCESS_TOKEN_TTL });
+  jwt.sign(
+    { role: user.role, ...(user.adminRole ? { adminRole: user.adminRole } : {}) },
+    env.JWT_ACCESS_SECRET,
+    { subject: user.id, expiresIn: env.ACCESS_TOKEN_TTL }
+  );
 
 async function issueRefreshToken(user, meta, familyId, client) {
   const raw = randomToken();
@@ -68,11 +76,27 @@ exports.login = async ({ email, password }, meta) => {
   const user = await repo.findUserByEmail(email);
   const ok = await bcrypt.compare(password, user?.passwordHash || DUMMY_HASH);
   if (!user || !ok) throw new ApiError(401, 'Invalid email or password', 'INVALID_CREDENTIALS');
-  if (user.status !== 'active') throw new ApiError(403, 'Account suspended', 'ACCOUNT_SUSPENDED');
+  if (user.status === 'suspended') throw new ApiError(403, 'Account suspended', 'ACCOUNT_SUSPENDED');
+  if (user.status === 'inactive') throw new ApiError(403, 'Account is deactivated', 'ACCOUNT_INACTIVE');
+  if (user.status !== 'active') throw new ApiError(403, 'Account unavailable', 'ACCOUNT_UNAVAILABLE');
   if (!user.emailVerifiedAt) throw new ApiError(403, 'Please verify your email first', 'EMAIL_NOT_VERIFIED');
 
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
+
+  const permissions =
+    user.role === 'admin'
+      ? await resolveUserPermissions(user.id, user.adminRole || 'ADMIN')
+      : undefined;
+
   const refresh = await issueRefreshToken(user, meta);
-  return { user: publicUser(user), accessToken: signAccessToken(user), refreshToken: refresh.raw };
+  return {
+    user: publicUser(user, permissions ? { permissions } : {}),
+    accessToken: signAccessToken(user),
+    refreshToken: refresh.raw,
+  };
 };
 
 exports.refresh = async (rawToken, meta) => {
@@ -169,5 +193,9 @@ exports.changePassword = async (userId, { currentPassword, newPassword }) => {
 exports.me = async (userId) => {
   const user = await repo.findUserById(userId);
   if (!user) throw new ApiError(404, 'User not found', 'NOT_FOUND');
-  return publicUser(user);
+  const permissions =
+    user.role === 'admin'
+      ? await resolveUserPermissions(user.id, user.adminRole || 'ADMIN')
+      : undefined;
+  return publicUser(user, permissions ? { permissions } : {});
 };

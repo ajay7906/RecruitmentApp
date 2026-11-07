@@ -66,12 +66,17 @@ function getNavItems(role) {
   if (role === "admin") {
     items.push(
       {
-        to: "/app/admin/companies",
+        to: "/admin/dashboard",
+        label: "Admin Console",
+        icon: ShieldCheck,
+      },
+      {
+        to: "/admin/companies/approvals",
         label: "Company approvals",
         icon: ShieldCheck,
       },
       {
-        to: "/app/admin/jobs",
+        to: "/admin/jobs/approvals",
         label: "Job moderation",
         icon: ShieldCheck,
       }

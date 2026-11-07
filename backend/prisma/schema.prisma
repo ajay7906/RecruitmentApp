@@ -16,9 +16,20 @@ enum UserRole {
   @@map("user_role")
 }
 
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+  SUPPORT_ADMIN
+  JOB_APPROVER
+
+  @@map("admin_role")
+}
+
 enum UserStatus {
   active
   suspended
+  inactive
 
   @@map("user_status")
 }
@@ -168,13 +179,159 @@ enum RescheduleRequestStatus {
   @@map("reschedule_request_status")
 }
 
+
+
+enum ReportStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+
+  @@map("report_status")
+}
+
+enum ReportEntityType {
+  USER
+  COMPANY
+  JOB
+
+  @@map("report_entity_type")
+}
+
+model AdminRolePermission {
+  role       AdminRole
+  permission String
+
+  @@id([role, permission])
+  @@map("admin_role_permissions")
+}
+
+model AdminUserPermission {
+  userId     String   @map("user_id") @db.Uuid
+  permission String
+  effect     String
+  grantedBy  String?  @map("granted_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@id([userId, permission])
+  @@map("admin_user_permissions")
+}
+
+model AdminRoleHistory {
+  id                  String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String     @map("user_id") @db.Uuid
+  changeType          String     @map("change_type")
+  previousRole        AdminRole? @map("previous_role")
+  newRole             AdminRole? @map("new_role")
+  previousPermissions Json?      @map("previous_permissions")
+  newPermissions      Json?      @map("new_permissions")
+  changedBy           String?    @map("changed_by") @db.Uuid
+  reason              String?
+  createdAt           DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt], map: "idx_admin_role_history_user")
+  @@map("admin_role_history")
+}
+
+model AccountStatusHistory {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  previousStatus String   @map("previous_status")
+  newStatus      String   @map("new_status")
+  reason         String?
+  actorId        String?  @map("actor_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt], map: "idx_account_status_history_user")
+  @@map("account_status_history")
+}
+
+model CompanyStatusHistory {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String        @map("company_id") @db.Uuid
+  previousStatus CompanyStatus @map("previous_status")
+  newStatus      CompanyStatus @map("new_status")
+  reason         String?
+  actorId        String?       @map("actor_id") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([companyId, createdAt], map: "idx_company_status_history_company")
+  @@map("company_status_history")
+}
+
+// Append-only (enforced by a DB trigger). No FK on actorId so records outlive users.
+model AuditLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId       String?  @map("actor_id") @db.Uuid
+  actorRole     String   @map("actor_role")
+  action        String
+  entityType    String   @map("entity_type")
+  entityId      String?  @map("entity_id")
+  previousValue Json?    @map("previous_value")
+  newValue      Json?    @map("new_value")
+  reason        String?
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt], map: "idx_audit_logs_created_at")
+  @@index([actorId, createdAt], map: "idx_audit_logs_actor")
+  @@index([action, createdAt], map: "idx_audit_logs_action")
+  @@index([entityType, entityId], map: "idx_audit_logs_entity")
+  @@map("audit_logs")
+}
+
+model Report {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType        ReportEntityType @map("entity_type")
+  entityId          String           @map("entity_id") @db.Uuid
+  reportedBy        String           @map("reported_by") @db.Uuid
+  reason            String
+  description       String?
+  status            ReportStatus     @default(OPEN)
+  assignedTo        String?          @map("assigned_to") @db.Uuid
+  resolution        String?
+  resolvedBy        String?          @map("resolved_by") @db.Uuid
+  resolvedAt        DateTime?        @map("resolved_at") @db.Timestamptz(6)
+  legacyJobReportId String?          @unique @map("legacy_job_report_id") @db.Uuid
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  notes ReportNote[]
+
+  @@index([status, createdAt], map: "idx_reports_status")
+  @@index([entityType, entityId], map: "idx_reports_entity")
+  @@index([assignedTo], map: "idx_reports_assigned")
+  @@map("reports")
+}
+
+model ReportNote {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reportId  String   @map("report_id") @db.Uuid
+  authorId  String?  @map("author_id") @db.Uuid
+  note      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, createdAt], map: "idx_report_notes_report")
+  @@map("report_notes")
+}
+
 model User {
   id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email           String     @unique // zod already lowercases it; see README note about citext
   passwordHash    String?    @map("password_hash") // nullable: Google OAuth users later
   fullName        String     @map("full_name")
   role            UserRole   @default(candidate)
+  adminRole       AdminRole? @map("admin_role")
   status          UserStatus @default(active)
+  lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  suspendedAt     DateTime?  @map("suspended_at") @db.Timestamptz(6)
+  suspendedById   String?    @map("suspended_by") @db.Uuid
+  suspensionReason String?   @map("suspension_reason")
+  statusChangedAt DateTime?  @map("status_changed_at") @db.Timestamptz(6)
   emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz(6)
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
