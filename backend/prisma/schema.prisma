@@ -374,6 +374,9 @@ model User {
   reviewedRescheduleReqs    InterviewRescheduleRequest[]  @relation("RecruiterReviewedRescheduleRequests")
   candidateHiringDecisions  HiringDecision[]              @relation("CandidateHiringDecisions")
   madeHiringDecisions       HiringDecision[]              @relation("HiringDecisionMaker")
+  notifications             Notification[]
+  emailDeliveries           EmailDelivery[]
+  notificationPreferences   NotificationPreference[]
 
   @@map("users")
 }
@@ -1099,4 +1102,135 @@ model JobReport {
   @@index([jobId], map: "idx_job_reports_job")
   @@index([status], map: "idx_job_reports_status")
   @@map("job_reports")
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+
+  @@map("notification_channel")
+}
+
+enum NotificationCategory {
+  ACCOUNT
+  COMPANY
+  JOB
+  APPLICATION
+  INTERVIEW
+  HIRING
+  SYSTEM
+  SECURITY
+  ADMIN
+
+  @@map("notification_category")
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+
+  @@map("notification_delivery_status")
+}
+
+model NotificationTemplate {
+  id            String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateKey   String               @map("template_key")
+  channel       NotificationChannel
+  category      NotificationCategory @default(SYSTEM)
+  subject       String?
+  titleTemplate String?              @map("title_template")
+  content       String
+  textFallback  String?              @map("text_fallback")
+  isActive      Boolean              @default(true) @map("is_active")
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  emailDeliveries EmailDelivery[]
+
+  @@unique([templateKey, channel], map: "uq_notification_templates_key_channel")
+  @@map("notification_templates")
+}
+
+model Notification {
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientId       String               @map("recipient_id") @db.Uuid
+  recipientRole     String?              @map("recipient_role")
+  title             String
+  message           String
+  category          NotificationCategory @default(SYSTEM)
+  eventType         String               @map("event_type")
+  relatedEntityType String?              @map("related_entity_type")
+  relatedEntityId   String?              @map("related_entity_id")
+  actionUrl         String?              @map("action_url")
+  metadata          Json?
+  idempotencyKey    String?              @unique @map("idempotency_key")
+  isRead            Boolean              @default(false) @map("is_read")
+  readAt            DateTime?            @map("read_at") @db.Timestamptz(6)
+  isDismissed       Boolean              @default(false) @map("is_dismissed")
+  dismissedAt       DateTime?            @map("dismissed_at") @db.Timestamptz(6)
+  expiresAt         DateTime?            @map("expires_at") @db.Timestamptz(6)
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isDismissed, createdAt], map: "idx_notifications_recipient_created")
+  @@index([recipientId, isRead, isDismissed], map: "idx_notifications_recipient_unread")
+  @@index([recipientId, category, createdAt], map: "idx_notifications_recipient_category")
+  @@index([eventType, createdAt], map: "idx_notifications_event_type")
+  @@map("notifications")
+}
+
+model EmailDelivery {
+  id                String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientId       String?                    @map("recipient_id") @db.Uuid
+  recipientEmail    String                     @map("recipient_email")
+  templateId        String?                    @map("template_id") @db.Uuid
+  templateKey       String?                    @map("template_key")
+  category          NotificationCategory       @default(SYSTEM)
+  eventType         String                     @map("event_type")
+  subject           String
+  bodyHtml          String                     @map("body_html")
+  bodyText          String?                    @map("body_text")
+  variables         Json?
+  relatedEntityType String?                    @map("related_entity_type")
+  relatedEntityId   String?                    @map("related_entity_id")
+  idempotencyKey    String?                    @unique @map("idempotency_key")
+  status            NotificationDeliveryStatus @default(PENDING)
+  provider          String                     @default("SMTP")
+  providerMessageId String?                    @map("provider_message_id")
+  providerResponse  Json?                      @map("provider_response")
+  attemptCount      Int                        @default(0) @map("attempt_count")
+  maxAttempts       Int                        @default(3) @map("max_attempts")
+  lastAttemptAt     DateTime?                  @map("last_attempt_at") @db.Timestamptz(6)
+  nextRetryAt       DateTime?                  @map("next_retry_at") @db.Timestamptz(6)
+  sentAt            DateTime?                  @map("sent_at") @db.Timestamptz(6)
+  failureReason     String?                    @map("failure_reason")
+  createdAt         DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  recipient User?                 @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  template  NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([status, nextRetryAt, createdAt], map: "idx_email_deliveries_status_retry")
+  @@index([recipientId, createdAt], map: "idx_email_deliveries_recipient")
+  @@index([eventType, createdAt], map: "idx_email_deliveries_event_type")
+  @@index([createdAt], map: "idx_email_deliveries_created_at")
+  @@map("email_deliveries")
+}
+
+model NotificationPreference {
+  id        String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String               @map("user_id") @db.Uuid
+  channel   NotificationChannel
+  category  NotificationCategory
+  enabled   Boolean              @default(true)
+  updatedAt DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel, category], map: "uq_notification_preferences_user_channel_category")
+  @@index([userId], map: "idx_notification_preferences_user")
+  @@map("notification_preferences")
 }

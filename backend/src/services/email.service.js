@@ -1,126 +1,287 @@
+'use strict';
+
+const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const env = require('../config/env');
 
-const transporter = env.SMTP_HOST
-  ? nodemailer.createTransport({
-      host: env.SMTP_HOST,
-      port: env.SMTP_PORT,
-      auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
-    })
-  : null;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-async function send({ to, subject, html }) {
-  if (!to) return;
-  if (!transporter) {
-    console.log(`\n[DEV EMAIL] to=${to}\nsubject=${subject}\n${html}\n`);
-    return;
+const smtpTransporter =
+  env.SMTP_HOST && env.NODE_ENV !== 'test'
+    ? nodemailer.createTransport({
+        host: env.SMTP_HOST,
+        port: env.SMTP_PORT,
+        auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+      })
+    : null;
+
+// Allows tests to inject a mock transport to verify provider failures & retry logic
+let customTransportFn = null;
+
+function setCustomTransport(fn) {
+  customTransportFn = typeof fn === 'function' ? fn : null;
+}
+
+function isValidEmailAddress(email) {
+  if (!email || typeof email !== 'string') return false;
+  return EMAIL_REGEX.test(email.trim());
+}
+
+/**
+ * Low-level mail dispatch returning provider delivery metadata.
+ */
+async function dispatchRawEmail({ to, subject, html, text }) {
+  if (!isValidEmailAddress(to)) {
+    const err = new Error('Invalid recipient email address');
+    err.code = 'INVALID_RECIPIENT_EMAIL';
+    throw err;
   }
-  await transporter.sendMail({ from: env.MAIL_FROM, to, subject, html });
-}
 
-function sendAsync(payload) {
-  Promise.resolve()
-    .then(() => send(payload))
-    .catch((err) => {
-      console.error(`[NOTIFICATION FAILURE] Failed to send email to ${payload?.to}:`, err?.message || err);
+  const normalizedTo = to.trim().toLowerCase();
+
+  if (customTransportFn) {
+    const result = await customTransportFn({
+      from: env.MAIL_FROM,
+      to: normalizedTo,
+      subject,
+      html,
+      text,
     });
+    return {
+      provider: result?.provider || 'CUSTOM_TRANSPORT',
+      messageId: result?.messageId || `custom-${crypto.randomUUID()}`,
+      response: result?.response || { accepted: [normalizedTo] },
+    };
+  }
+
+  if (!smtpTransporter) {
+    if (env.NODE_ENV !== 'test') {
+      console.log(`\n[DEV EMAIL] to=${normalizedTo}\nsubject=${subject}\n`);
+    }
+    return {
+      provider: 'DEV_CONSOLE',
+      messageId: `dev-${crypto.randomUUID()}`,
+      response: { accepted: [normalizedTo], mode: 'DEV_CONSOLE' },
+    };
+  }
+
+  const info = await smtpTransporter.sendMail({
+    from: env.MAIL_FROM,
+    to: normalizedTo,
+    subject,
+    html,
+    text,
+  });
+
+  return {
+    provider: 'SMTP',
+    messageId: info?.messageId || `smtp-${crypto.randomUUID()}`,
+    response: {
+      accepted: info?.accepted || [normalizedTo],
+      rejected: info?.rejected || [],
+      envelope: info?.envelope || null,
+      response: info?.response || 'OK',
+    },
+  };
 }
 
-exports.sendVerificationEmail = (to, token) => {
+// ── Backward-compatible wrappers routed through centralized Notifications Service ──
+
+function getNotificationsService() {
+  return require('../modules/notifications/notifications.service');
+}
+
+exports.setCustomTransport = setCustomTransport;
+exports.isValidEmailAddress = isValidEmailAddress;
+exports.dispatchRawEmail = dispatchRawEmail;
+
+exports.sendVerificationEmail = async (to, token, user = null) => {
   const link = `${env.CLIENT_URL}/verify-email?token=${token}`;
-  return send({
-    to,
-    subject: 'Verify your email',
-    html: `<p>Verify your email: <a href="${link}">${link}</a></p><p>Valid for 24 hours.</p>`,
+  return getNotificationsService().sendDirectTemplateEmail({
+    recipientEmail: to,
+    recipientId: user?.id || null,
+    templateKey: 'EMAIL_VERIFICATION',
+    eventType: 'EMAIL_VERIFICATION',
+    category: 'SECURITY',
+    actionUrl: `/verify-email?token=${token}`,
+    variables: {
+      userName: user?.fullName || to.split('@')[0],
+      verificationUrl: link,
+    },
+    awaitDelivery: true,
   });
 };
 
-exports.sendPasswordResetEmail = (to, token) => {
+exports.sendPasswordResetEmail = async (to, token, user = null) => {
   const link = `${env.CLIENT_URL}/reset-password?token=${token}`;
-  return send({
-    to,
-    subject: 'Reset your password',
-    html: `<p>Reset your password: <a href="${link}">${link}</a></p><p>Valid for 1 hour.</p>`,
+  return getNotificationsService().sendDirectTemplateEmail({
+    recipientEmail: to,
+    recipientId: user?.id || null,
+    templateKey: 'PASSWORD_RESET_REQUESTED',
+    eventType: 'PASSWORD_RESET_REQUESTED',
+    category: 'SECURITY',
+    actionUrl: `/reset-password?token=${token}`,
+    variables: {
+      userName: user?.fullName || to.split('@')[0],
+      resetUrl: link,
+    },
+    awaitDelivery: true,
   });
 };
 
-exports.notifyCandidateInterviewScheduled = ({ to, candidateName, jobTitle, companyName, roundNumber, interviewType, startTime, endTime, timeZone, interviewMode, meetingLink, location }) => {
-  sendAsync({
-    to,
-    subject: `Interview Scheduled: Round ${roundNumber} (${interviewType}) - ${jobTitle} at ${companyName}`,
-    html: `<p>Hello ${candidateName || 'Candidate'},</p>
-      <p>Your <strong>Round ${roundNumber}: ${interviewType}</strong> interview for <strong>${jobTitle}</strong> at <strong>${companyName}</strong> has been scheduled.</p>
-      <ul>
-        <li><strong>Start:</strong> ${new Date(startTime).toUTCString()} (${timeZone})</li>
-        <li><strong>End:</strong> ${new Date(endTime).toUTCString()} (${timeZone})</li>
-        <li><strong>Mode:</strong> ${interviewMode}</li>
-        ${meetingLink ? `<li><strong>Meeting Link:</strong> <a href="${meetingLink}">${meetingLink}</a></li>` : ''}
-        ${location ? `<li><strong>Location:</strong> ${location}</li>` : ''}
-      </ul>`,
-  });
+exports.notifyCandidateInterviewScheduled = (payload) => {
+  getNotificationsService()
+    .notifyUser({
+      recipientEmail: payload.to,
+      recipientId: payload.candidateId || null,
+      templateKey: 'INTERVIEW_SCHEDULED_CANDIDATE',
+      eventType: 'INTERVIEW_SCHEDULED',
+      category: 'INTERVIEW',
+      actionUrl: payload.interviewId ? `/app/interviews/${payload.interviewId}` : '/app/interviews',
+      variables: {
+        candidateName: payload.candidateName || 'Candidate',
+        jobTitle: payload.jobTitle || 'Role',
+        companyName: payload.companyName || 'Company',
+        roundNumber: payload.roundNumber || 1,
+        interviewType: payload.interviewType || 'Interview',
+        interviewDate: payload.startTime ? new Date(payload.startTime).toUTCString() : '',
+        interviewTime: payload.startTime ? new Date(payload.startTime).toLocaleTimeString('en-US') : '',
+        timeZone: payload.timeZone || 'UTC',
+        interviewMode: payload.interviewMode || 'ONLINE',
+        interviewLocation: payload.meetingLink || payload.location || 'Online',
+      },
+    })
+    .catch(() => {});
 };
 
-exports.notifyCandidateInterviewRescheduled = ({ to, candidateName, jobTitle, companyName, roundNumber, startTime, endTime, timeZone, reason }) => {
-  sendAsync({
-    to,
-    subject: `Interview Rescheduled: Round ${roundNumber} - ${jobTitle} at ${companyName}`,
-    html: `<p>Hello ${candidateName || 'Candidate'},</p>
-      <p>Your Round ${roundNumber} interview for <strong>${jobTitle}</strong> at <strong>${companyName}</strong> has been rescheduled.</p>
-      <ul>
-        <li><strong>New Start:</strong> ${new Date(startTime).toUTCString()} (${timeZone})</li>
-        <li><strong>New End:</strong> ${new Date(endTime).toUTCString()} (${timeZone})</li>
-        ${reason ? `<li><strong>Reason:</strong> ${reason}</li>` : ''}
-      </ul>`,
-  });
+exports.notifyCandidateInterviewRescheduled = (payload) => {
+  getNotificationsService()
+    .notifyUser({
+      recipientEmail: payload.to,
+      recipientId: payload.candidateId || null,
+      templateKey: 'INTERVIEW_RESCHEDULED',
+      eventType: 'INTERVIEW_RESCHEDULED',
+      category: 'INTERVIEW',
+      actionUrl: payload.interviewId ? `/app/interviews/${payload.interviewId}` : '/app/interviews',
+      variables: {
+        recipientName: payload.candidateName || 'Candidate',
+        jobTitle: payload.jobTitle || 'Role',
+        companyName: payload.companyName || 'Company',
+        roundNumber: payload.roundNumber || 1,
+        interviewDate: payload.startTime ? new Date(payload.startTime).toUTCString() : '',
+        interviewTime: payload.startTime ? new Date(payload.startTime).toLocaleTimeString('en-US') : '',
+        timeZone: payload.timeZone || 'UTC',
+        reason: payload.reason || 'Schedule updated',
+      },
+    })
+    .catch(() => {});
 };
 
-exports.notifyCandidateInterviewCancelled = ({ to, candidateName, jobTitle, companyName, roundNumber, reason }) => {
-  sendAsync({
-    to,
-    subject: `Interview Cancelled: Round ${roundNumber} - ${jobTitle} at ${companyName}`,
-    html: `<p>Hello ${candidateName || 'Candidate'},</p>
-      <p>Your Round ${roundNumber} interview for <strong>${jobTitle}</strong> at <strong>${companyName}</strong> has been cancelled.</p>
-      ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}`,
-  });
+exports.notifyCandidateInterviewCancelled = (payload) => {
+  getNotificationsService()
+    .notifyUser({
+      recipientEmail: payload.to,
+      recipientId: payload.candidateId || null,
+      templateKey: 'INTERVIEW_CANCELLED',
+      eventType: 'INTERVIEW_CANCELLED',
+      category: 'INTERVIEW',
+      actionUrl: '/app/interviews',
+      variables: {
+        recipientName: payload.candidateName || 'Candidate',
+        jobTitle: payload.jobTitle || 'Role',
+        companyName: payload.companyName || 'Company',
+        roundNumber: payload.roundNumber || 1,
+        reason: payload.reason || 'Cancelled by recruiter',
+      },
+    })
+    .catch(() => {});
 };
 
-exports.notifyInterviewerAssigned = ({ to, interviewerName, candidateName, jobTitle, companyName, roundNumber, interviewType, role, startTime, timeZone }) => {
-  sendAsync({
-    to,
-    subject: `New Interview Assignment: ${candidateName} (${jobTitle})`,
-    html: `<p>Hello ${interviewerName || 'Interviewer'},</p>
-      <p>You have been assigned as <strong>${role}</strong> for <strong>Round ${roundNumber}: ${interviewType}</strong> with candidate <strong>${candidateName}</strong> for <strong>${jobTitle}</strong> (${companyName}).</p>
-      <p><strong>Scheduled Time:</strong> ${new Date(startTime).toUTCString()} (${timeZone})</p>`,
-  });
+exports.notifyInterviewerAssigned = (payload) => {
+  getNotificationsService()
+    .notifyUser({
+      recipientEmail: payload.to,
+      recipientId: payload.interviewerId || null,
+      templateKey: 'INTERVIEW_ASSIGNED_INTERVIEWER',
+      eventType: 'INTERVIEW_ASSIGNED',
+      category: 'INTERVIEW',
+      actionUrl: payload.interviewId ? `/app/recruiter/interviews/${payload.interviewId}` : '/app/recruiter/interviews',
+      variables: {
+        interviewerName: payload.interviewerName || 'Interviewer',
+        interviewerRole: payload.role || 'Interviewer',
+        candidateName: payload.candidateName || 'Candidate',
+        jobTitle: payload.jobTitle || 'Role',
+        companyName: payload.companyName || 'Company',
+        roundNumber: payload.roundNumber || 1,
+        interviewType: payload.interviewType || 'Interview',
+        interviewDate: payload.startTime ? new Date(payload.startTime).toUTCString() : '',
+        interviewTime: payload.startTime ? new Date(payload.startTime).toLocaleTimeString('en-US') : '',
+        timeZone: payload.timeZone || 'UTC',
+        interviewLocation: payload.meetingLink || payload.location || 'Online',
+      },
+    })
+    .catch(() => {});
 };
 
-exports.notifyRecruiterRescheduleRequest = ({ to, candidateName, jobTitle, roundNumber, requestedStartTime, timeZone, reason }) => {
-  sendAsync({
-    to,
-    subject: `Reschedule Request from ${candidateName} (Round ${roundNumber} - ${jobTitle})`,
-    html: `<p>Candidate <strong>${candidateName}</strong> has requested to reschedule Round ${roundNumber} for <strong>${jobTitle}</strong>.</p>
-      <ul>
-        <li><strong>Requested Time:</strong> ${new Date(requestedStartTime).toUTCString()} (${timeZone})</li>
-        <li><strong>Reason:</strong> ${reason}</li>
-      </ul>`,
-  });
+exports.notifyRecruiterRescheduleRequest = (payload) => {
+  getNotificationsService()
+    .notifyUser({
+      recipientEmail: payload.to,
+      recipientId: payload.recruiterId || null,
+      templateKey: 'INTERVIEW_RESCHEDULE_REQUESTED',
+      eventType: 'INTERVIEW_RESCHEDULE_REQUESTED',
+      category: 'INTERVIEW',
+      actionUrl: payload.interviewId ? `/app/recruiter/interviews/${payload.interviewId}` : '/app/recruiter/interviews',
+      variables: {
+        recruiterName: payload.recruiterName || 'Recruiter',
+        candidateName: payload.candidateName || 'Candidate',
+        jobTitle: payload.jobTitle || 'Role',
+        roundNumber: payload.roundNumber || 1,
+        interviewDate: payload.requestedStartTime ? new Date(payload.requestedStartTime).toUTCString() : '',
+        interviewTime: payload.requestedStartTime ? new Date(payload.requestedStartTime).toLocaleTimeString('en-US') : '',
+        timeZone: payload.timeZone || 'UTC',
+        reason: payload.reason || '',
+      },
+    })
+    .catch(() => {});
 };
 
-exports.notifyRecruiterFeedbackSubmitted = ({ to, interviewerName, candidateName, jobTitle, roundNumber, recommendation }) => {
-  sendAsync({
-    to,
-    subject: `Interview Feedback Submitted: ${candidateName} (Round ${roundNumber})`,
-    html: `<p><strong>${interviewerName}</strong> submitted evaluation feedback for <strong>${candidateName}</strong> (Round ${roundNumber} - ${jobTitle}).</p>
-      <p><strong>Recommendation:</strong> ${recommendation}</p>`,
-  });
+exports.notifyRecruiterFeedbackSubmitted = (payload) => {
+  getNotificationsService()
+    .notifyUser({
+      recipientEmail: payload.to,
+      recipientId: payload.recruiterId || null,
+      templateKey: 'INTERVIEW_FEEDBACK_SUBMITTED',
+      eventType: 'INTERVIEW_FEEDBACK_SUBMITTED',
+      category: 'INTERVIEW',
+      actionUrl: payload.interviewId ? `/app/recruiter/interviews/${payload.interviewId}` : '/app/recruiter/interviews',
+      variables: {
+        recruiterName: payload.recruiterName || 'Recruiter',
+        interviewerName: payload.interviewerName || 'Interviewer',
+        candidateName: payload.candidateName || 'Candidate',
+        jobTitle: payload.jobTitle || 'Role',
+        roundNumber: payload.roundNumber || 1,
+        recommendation: payload.recommendation || '',
+      },
+    })
+    .catch(() => {});
 };
 
-exports.notifyCandidateHiringDecision = ({ to, candidateName, jobTitle, companyName, decision, newApplicationStatus }) => {
-  sendAsync({
-    to,
-    subject: `Application Update: ${jobTitle} at ${companyName}`,
-    html: `<p>Hello ${candidateName || 'Candidate'},</p>
-      <p>There is an update on your application for <strong>${jobTitle}</strong> at <strong>${companyName}</strong>.</p>
-      <p><strong>Current Stage:</strong> ${newApplicationStatus || decision}</p>`,
-  });
+exports.notifyCandidateHiringDecision = (payload) => {
+  getNotificationsService()
+    .notifyUser({
+      recipientEmail: payload.to,
+      recipientId: payload.candidateId || null,
+      templateKey: 'HIRING_DECISION_CANDIDATE',
+      eventType: 'HIRING_DECISION_MADE',
+      category: 'HIRING',
+      actionUrl: payload.applicationId ? `/app/applications/${payload.applicationId}` : '/app/applications',
+      variables: {
+        candidateName: payload.candidateName || 'Candidate',
+        jobTitle: payload.jobTitle || 'Role',
+        companyName: payload.companyName || 'Company',
+        applicationStatus: payload.newApplicationStatus || payload.decision || 'UPDATED',
+      },
+    })
+    .catch(() => {});
 };

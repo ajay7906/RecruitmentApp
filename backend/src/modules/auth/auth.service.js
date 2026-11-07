@@ -8,6 +8,7 @@ const { randomToken, sha256 } = require('../../utils/crypto');
 const repo = require('./auth.repository');
 const mail = require('../../services/email.service');
 const { resolveUserPermissions } = require('../admin/admin.permissions');
+const notificationsService = require('../notifications/notifications.service');
 
 const HOUR = 60 * 60 * 1000;
 // Runs fn(tx) in one DB transaction; rolls back automatically if fn throws.
@@ -56,7 +57,7 @@ async function createAndSendToken(user, type, ttlMs, sender, client) {
     { userId: user.id, type, tokenHash: sha256(raw), expiresAt: new Date(Date.now() + ttlMs) },
     client
   );
-  return () => sender(user.email, raw).catch((e) => console.error('Email failed', e.message));
+  return () => sender(user.email, raw, user).catch((e) => console.error('Email failed', e.message));
 }
 
 exports.register = async ({ fullName, email, password, role }) => {
@@ -69,6 +70,24 @@ exports.register = async ({ fullName, email, password, role }) => {
     return { user, sendMail };
   });
   sendMail(); // after commit; swap for a BullMQ job when you add the queue
+  notificationsService
+    .notifyUser({
+      recipientId: user.id,
+      recipientEmail: user.email,
+      recipientRole: user.role,
+      templateKey: 'WELCOME_REGISTERED',
+      eventType: 'WELCOME_REGISTERED',
+      category: 'ACCOUNT',
+      variables: {
+        userName: user.fullName,
+        userRole: user.role,
+      },
+      relatedEntityType: 'USER',
+      relatedEntityId: user.id,
+      actionUrl: '/app/dashboard',
+      idempotencyKey: `welcome:${user.id}`,
+    })
+    .catch(() => {});
   return publicUser(user);
 };
 
@@ -142,11 +161,27 @@ exports.logout = async (rawToken) => {
 };
 
 exports.verifyEmail = async (token) => {
+  let verifiedUserId = null;
   await withTransaction(async (client) => {
     const row = await repo.consumeAuthToken(sha256(token), 'email_verification', client);
     if (!row) throw new ApiError(400, 'Invalid or expired token', 'INVALID_TOKEN');
     await repo.markEmailVerified(row.userId, client);
+    verifiedUserId = row.userId;
   });
+  if (verifiedUserId) {
+    notificationsService
+      .notifyUser({
+        recipientId: verifiedUserId,
+        templateKey: 'EMAIL_VERIFIED',
+        eventType: 'EMAIL_VERIFIED',
+        category: 'ACCOUNT',
+        relatedEntityType: 'USER',
+        relatedEntityId: verifiedUserId,
+        actionUrl: '/app/dashboard',
+        idempotencyKey: `email-verified:${verifiedUserId}`,
+      })
+      .catch(() => {});
+  }
 };
 
 exports.resendVerification = async (email) => {
@@ -169,13 +204,29 @@ exports.forgotPassword = async (email) => {
 
 exports.resetPassword = async ({ token, newPassword }) => {
   const passwordHash = await bcrypt.hash(newPassword, 12);
+  let targetUserId = null;
   await withTransaction(async (client) => {
     const row = await repo.consumeAuthToken(sha256(token), 'password_reset', client);
     if (!row) throw new ApiError(400, 'Invalid or expired token', 'INVALID_TOKEN');
     await repo.updatePassword(row.userId, passwordHash, client);
     await repo.markEmailVerified(row.userId, client); // they proved inbox ownership
     await repo.revokeAllUserTokens(row.userId, client); // log out everywhere
+    targetUserId = row.userId;
   });
+  if (targetUserId) {
+    notificationsService
+      .notifyUser({
+        recipientId: targetUserId,
+        templateKey: 'PASSWORD_CHANGED',
+        eventType: 'PASSWORD_CHANGED',
+        category: 'SECURITY',
+        variables: { timestamp: new Date().toUTCString() },
+        relatedEntityType: 'USER',
+        relatedEntityId: targetUserId,
+        actionUrl: '/app/profile',
+      })
+      .catch(() => {});
+  }
 };
 
 exports.changePassword = async (userId, { currentPassword, newPassword }) => {
@@ -188,6 +239,20 @@ exports.changePassword = async (userId, { currentPassword, newPassword }) => {
     await repo.updatePassword(userId, passwordHash, client);
     await repo.revokeAllUserTokens(userId, client);
   });
+  notificationsService
+    .notifyUser({
+      recipientId: user.id,
+      recipientEmail: user.email,
+      recipientRole: user.role,
+      templateKey: 'PASSWORD_CHANGED',
+      eventType: 'PASSWORD_CHANGED',
+      category: 'SECURITY',
+      variables: { userName: user.fullName, timestamp: new Date().toUTCString() },
+      relatedEntityType: 'USER',
+      relatedEntityId: user.id,
+      actionUrl: '/app/profile',
+    })
+    .catch(() => {});
 };
 
 exports.me = async (userId) => {

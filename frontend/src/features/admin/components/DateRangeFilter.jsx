@@ -5,6 +5,8 @@ const PRESETS = [
   { value: "7d", label: "7 Days" },
   { value: "30d", label: "30 Days" },
   { value: "90d", label: "90 Days" },
+  { value: "this_month", label: "This Month" },
+  { value: "last_month", label: "Last Month" },
   { value: "custom", label: "Custom" },
 ];
 

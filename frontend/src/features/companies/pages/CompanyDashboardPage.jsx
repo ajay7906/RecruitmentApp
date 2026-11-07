@@ -17,6 +17,8 @@ import {
   ArrowUpRight,
   Crown,
   Plus,
+  BarChart3,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import { companiesApi } from "../api/companiesApi";
@@ -156,13 +158,29 @@ export function CompanyDashboardPage() {
             </Link>
 
             {canEdit && (
-              <Link
-                to={`/app/companies/${company.id}/edit`}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                <Pencil size={16} />
-                Edit Company
-              </Link>
+              <>
+                <Link
+                  to={`/app/companies/${company.id}/analytics`}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <BarChart3 size={16} />
+                  Analytics
+                </Link>
+                <Link
+                  to={`/app/companies/${company.id}/reports`}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <FileSpreadsheet size={16} />
+                  Reports
+                </Link>
+                <Link
+                  to={`/app/companies/${company.id}/edit`}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <Pencil size={16} />
+                  Edit Company
+                </Link>
+              </>
             )}
 
             {canSubmit && (

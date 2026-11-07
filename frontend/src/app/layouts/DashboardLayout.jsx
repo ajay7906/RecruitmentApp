@@ -10,12 +10,16 @@ import {
   FileUp,
   CalendarClock,
   Award,
+  Bell,
+  BarChart3,
+  FileSpreadsheet,
   LogOut,
   Menu,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuthStore } from "../../stores/authStore";
 import { authApi } from "../../features/auth/api/authApi";
+import { NotificationBell } from "../../features/notifications/components/NotificationBell";
 
 function getNavItems(role) {
   const items = [
@@ -85,8 +89,18 @@ function getNavItems(role) {
 
   items.push(
     { to: "/app/jobs", label: "Find jobs", icon: Search, end: true },
-    { to: "/app/applications", label: "Applications", icon: FileText }
+    { to: "/app/applications", label: "Applications", icon: FileText },
+    { to: "/app/notifications", label: "Notifications", icon: Bell },
+    { to: "/app/analytics", label: "Analytics", icon: BarChart3 }
   );
+
+  if (role === "recruiter" || role === "admin") {
+    items.push({
+      to: "/app/reports",
+      label: "Reports & Export",
+      icon: FileSpreadsheet,
+    });
+  }
 
   return items;
 }
@@ -179,6 +193,7 @@ export function DashboardLayout() {
             <Menu size={20} />
           </button>
           <div className="ml-auto flex items-center gap-3">
+            <NotificationBell />
             <div className="text-right">
               <p className="text-sm font-semibold text-slate-800">
                 {displayName}

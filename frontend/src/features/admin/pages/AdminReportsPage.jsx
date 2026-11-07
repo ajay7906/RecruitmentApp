@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { Eye } from "lucide-react";
+import { Eye, Flag, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { adminApi } from "../api/adminApi";
 import { AdminSearch } from "../components/AdminSearch";
 import { AdminFilters } from "../components/AdminFilters";
 import { AdminDataTable } from "../components/AdminDataTable";
 import { ReportDetails } from "../components/ReportDetails";
+import { ReportsCenterPage } from "../../notifications/pages/ReportsCenterPage";
 import { useAuthStore } from "../../../stores/authStore";
 
 const STATUS_BADGE = {
@@ -22,6 +23,7 @@ export function AdminReportsPage() {
     !Array.isArray(user?.permissions) ||
     user.permissions.includes("reports.manage");
 
+  const [activeView, setActiveView] = useState("moderation");
   const [q, setQ] = useState("");
   const [entityType, setEntityType] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -185,16 +187,47 @@ export function AdminReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Flagged Content & Moderation Queue
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Investigate and resolve abuse, fraud, or policy violation reports across users, companies, and job postings.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Reports, Exports & Moderation Queue
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Generate and export live platform reports (CSV, Excel, JSON) or investigate flagged content reports.
+          </p>
+        </div>
+
+        <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setActiveView("moderation")}
+            className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition ${
+              activeView === "moderation"
+                ? "bg-brand text-white"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <Flag size={14} /> Moderation Queue ({counts.OPEN ?? 0})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveView("business")}
+            className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition ${
+              activeView === "business"
+                ? "bg-brand text-white"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <FileSpreadsheet size={14} /> Business Reports & Export
+          </button>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      {activeView === "business" ? (
+        <ReportsCenterPage embedded={true} />
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2">
         {[
           { key: "", label: `All (${counts.ALL ?? 0})` },
           { key: "OPEN", label: `Open (${counts.OPEN ?? 0})` },
@@ -269,6 +302,8 @@ export function AdminReportsPage() {
           onAssign={handleAssign}
           onAddNote={handleAddNote}
         />
+      )}
+        </>
       )}
     </div>
   );

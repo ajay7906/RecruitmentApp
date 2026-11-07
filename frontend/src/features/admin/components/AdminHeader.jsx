@@ -1,5 +1,6 @@
 import { Menu } from "lucide-react";
 import { AdminRoleBadge } from "./UserStatusBadge";
+import { NotificationBell } from "../../notifications/components/NotificationBell";
 
 export function AdminHeader({ user, onOpenMobileMenu }) {
   const displayName = user?.fullName || user?.name || "Administrator";
@@ -23,6 +24,7 @@ export function AdminHeader({ user, onOpenMobileMenu }) {
       </div>
 
       <div className="flex items-center gap-3">
+        <NotificationBell />
         <AdminRoleBadge role={user?.adminRole || "ADMIN"} />
         <div className="hidden text-right sm:block">
           <p className="text-sm font-semibold text-slate-900">{displayName}</p>

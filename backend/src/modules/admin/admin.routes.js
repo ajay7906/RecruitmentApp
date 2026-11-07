@@ -172,6 +172,16 @@ router.post(
 );
 
 // ── Platform Analytics ────────────────────────────────────────────────────
+const analyticsController = require('../analytics/analytics.controller');
+const notificationsController = require('../notifications/notifications.controller');
+const notificationsValidation = require('../notifications/notifications.validation');
+
+router.get(
+  '/analytics/overview',
+  requirePermission('analytics.read'),
+  validate(v.analyticsQuery),
+  analyticsController.getAdminOverviewAnalytics
+);
 router.get(
   '/analytics/users',
   requirePermission('analytics.read'),
@@ -191,10 +201,54 @@ router.get(
   c.getJobAnalytics
 );
 router.get(
+  '/analytics/applications',
+  requirePermission('analytics.read'),
+  validate(v.analyticsQuery),
+  analyticsController.getAdminApplicationAnalytics
+);
+router.get(
+  '/analytics/interviews',
+  requirePermission('analytics.read'),
+  validate(v.analyticsQuery),
+  analyticsController.getAdminInterviewAnalytics
+);
+router.get(
+  '/analytics/hiring',
+  requirePermission('analytics.read'),
+  validate(v.analyticsQuery),
+  analyticsController.getAdminHiringAnalytics
+);
+router.get(
   '/analytics/recruitment',
   requirePermission('analytics.read'),
   validate(v.analyticsQuery),
   c.getRecruitmentAnalytics
+);
+
+// ── Admin Notification Monitoring ─────────────────────────────────────────
+router.get(
+  '/notifications',
+  requirePermission('notifications.read'),
+  validate(notificationsValidation.adminDeliveriesQuery),
+  notificationsController.listAdminDeliveries
+);
+router.get(
+  '/notifications/failed',
+  requirePermission('notifications.read'),
+  validate(notificationsValidation.adminDeliveriesQuery),
+  notificationsController.listFailedAdminDeliveries
+);
+router.get(
+  '/notifications/:id',
+  requirePermission('notifications.read'),
+  validate(notificationsValidation.notificationIdParam),
+  notificationsController.getAdminDeliveryDetails
+);
+router.post(
+  '/notifications/:id/retry',
+  requirePermission('notifications.manage'),
+  validate(notificationsValidation.notificationIdParam),
+  notificationsController.retryAdminDelivery
 );
 
 // ── Administrators & Permissions Governance ───────────────────────────────

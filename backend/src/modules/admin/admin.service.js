@@ -51,6 +51,11 @@ function resolveDateRange({ range = '30d', from, to } = {}) {
     } else if (range === '90d') {
       d.setDate(d.getDate() - 90);
       fromDate = d;
+    } else if (range === 'this_month') {
+      fromDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0));
+    } else if (range === 'last_month') {
+      fromDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0));
+      toDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999));
     }
   }
 

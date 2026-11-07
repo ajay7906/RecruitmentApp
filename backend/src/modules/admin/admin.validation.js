@@ -9,7 +9,7 @@ const paginationSchema = z.object({
 });
 
 const dateRangeQuerySchema = z.object({
-  range: z.enum(['today', '7d', '30d', '90d', 'custom', 'all']).optional(),
+  range: z.enum(['today', '7d', '30d', '90d', 'this_month', 'last_month', 'custom', 'all']).optional(),
   from: z.string().optional(),
   to: z.string().optional(),
 });

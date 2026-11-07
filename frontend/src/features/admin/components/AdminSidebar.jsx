@@ -11,6 +11,8 @@ import {
   FileSearch,
   Flag,
   BarChart3,
+  Bell,
+  MailCheck,
   UserCog,
   KeyRound,
   Settings,
@@ -25,6 +27,8 @@ const NAV_SECTIONS = [
       { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/admin/analytics", label: "Reports & Analytics", icon: BarChart3, perm: "analytics.read" },
       { to: "/admin/activities", label: "Platform Activities", icon: Activity, perm: "activities.read" },
+      { to: "/admin/notifications", label: "My Notifications", icon: Bell },
+      { to: "/admin/notification-monitoring", label: "Notification Monitoring", icon: MailCheck, perm: "notifications.read" },
     ],
   },
   {

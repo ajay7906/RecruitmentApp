@@ -1,10 +1,29 @@
+'use strict';
+
 const asyncHandler = require('../../utils/asyncHandler');
 const service = require('./companies.service');
+const notificationsService = require('../notifications/notifications.service');
 
 const ok = (res, data, status = 200) => res.status(status).json({ success: true, data });
 
 exports.registerCompany = asyncHandler(async (req, res) => {
   const company = await service.registerCompany(req.user, req.body);
+  notificationsService
+    .notifyUser({
+      recipientId: req.user.id,
+      templateKey: 'COMPANY_REGISTERED',
+      eventType: 'COMPANY_REGISTERED',
+      category: 'COMPANY',
+      variables: {
+        recruiterName: req.user.fullName || 'Recruiter',
+        companyName: company.name,
+      },
+      relatedEntityType: 'COMPANY',
+      relatedEntityId: company.id,
+      actionUrl: `/app/companies/${company.id}/dashboard`,
+      idempotencyKey: `company-registered:${company.id}`,
+    })
+    .catch(() => {});
   ok(res, { company }, 201);
 });
 
@@ -51,21 +70,93 @@ exports.updateCompanyLogo = asyncHandler(async (req, res) => {
 
 exports.submitCompany = asyncHandler(async (req, res) => {
   const company = await service.submitCompanyForApproval(req.user, req.params.id);
+  notificationsService
+    .notifyUser({
+      recipientId: req.user.id,
+      templateKey: 'COMPANY_SUBMITTED_FOR_APPROVAL',
+      eventType: 'COMPANY_SUBMITTED_FOR_APPROVAL',
+      category: 'COMPANY',
+      variables: {
+        recruiterName: req.user.fullName || 'Recruiter',
+        companyName: company.name,
+      },
+      relatedEntityType: 'COMPANY',
+      relatedEntityId: company.id,
+      actionUrl: `/app/companies/${company.id}/approval`,
+    })
+    .catch(() => {});
+  notificationsService
+    .notifyAdminsByPermission({
+      permission: 'companies.approve',
+      templateKey: 'ADMIN_COMPANY_REVIEW_REQUIRED',
+      eventType: 'ADMIN_COMPANY_REVIEW_REQUIRED',
+      category: 'ADMIN',
+      variables: {
+        recruiterName: req.user.fullName || 'Recruiter',
+        companyName: company.name,
+      },
+      relatedEntityType: 'COMPANY',
+      relatedEntityId: company.id,
+      actionUrl: `/admin/companies/${company.id}`,
+    })
+    .catch(() => {});
   ok(res, { company, message: 'Company submitted for approval' });
 });
 
 exports.approveCompany = asyncHandler(async (req, res) => {
   const company = await service.approveCompany(req.user, req.params.id);
+  if (company.ownerId) {
+    notificationsService
+      .notifyUser({
+        recipientId: company.ownerId,
+        templateKey: 'COMPANY_APPROVED',
+        eventType: 'COMPANY_APPROVED',
+        category: 'COMPANY',
+        variables: { companyName: company.name },
+        relatedEntityType: 'COMPANY',
+        relatedEntityId: company.id,
+        actionUrl: `/app/companies/${company.id}/dashboard`,
+      })
+      .catch(() => {});
+  }
   ok(res, { company, message: 'Company approved successfully' });
 });
 
 exports.rejectCompany = asyncHandler(async (req, res) => {
   const company = await service.rejectCompany(req.user, req.params.id, req.body.reason);
+  if (company.ownerId) {
+    notificationsService
+      .notifyUser({
+        recipientId: company.ownerId,
+        templateKey: 'COMPANY_REJECTED',
+        eventType: 'COMPANY_REJECTED',
+        category: 'COMPANY',
+        variables: { companyName: company.name, reason: req.body.reason },
+        relatedEntityType: 'COMPANY',
+        relatedEntityId: company.id,
+        actionUrl: `/app/companies/${company.id}/approval`,
+      })
+      .catch(() => {});
+  }
   ok(res, { company, message: 'Company rejected' });
 });
 
 exports.suspendCompany = asyncHandler(async (req, res) => {
   const company = await service.suspendCompany(req.user, req.params.id, req.body.reason);
+  if (company.ownerId) {
+    notificationsService
+      .notifyUser({
+        recipientId: company.ownerId,
+        templateKey: 'COMPANY_SUSPENDED',
+        eventType: 'COMPANY_SUSPENDED',
+        category: 'COMPANY',
+        variables: { companyName: company.name, reason: req.body.reason },
+        relatedEntityType: 'COMPANY',
+        relatedEntityId: company.id,
+        actionUrl: `/app/companies/${company.id}/dashboard`,
+      })
+      .catch(() => {});
+  }
   ok(res, { company, message: 'Company suspended' });
 });
 

@@ -57,6 +57,13 @@ import { AdminAnalyticsPage } from "../features/admin/pages/AdminAnalyticsPage";
 import { AdminAdministratorsPage } from "../features/admin/pages/AdminAdministratorsPage";
 import { AdminPermissionsPage } from "../features/admin/pages/AdminPermissionsPage";
 import { AdminSettingsPage } from "../features/admin/pages/AdminSettingsPage";
+import { NotificationsPage } from "../features/notifications/pages/NotificationsPage";
+import { NotificationSettingsPage } from "../features/notifications/pages/NotificationSettingsPage";
+import { CandidateAnalyticsPage } from "../features/notifications/pages/CandidateAnalyticsPage";
+import { RecruiterAnalyticsPage } from "../features/notifications/pages/RecruiterAnalyticsPage";
+import { CompanyAnalyticsPage } from "../features/notifications/pages/CompanyAnalyticsPage";
+import { ReportsCenterPage } from "../features/notifications/pages/ReportsCenterPage";
+import { AdminNotificationMonitoringPage } from "../features/notifications/pages/AdminNotificationMonitoringPage";
 import { useAuthStore } from "../stores/authStore";
 
 function RoleBasedProfilePage() {
@@ -65,6 +72,14 @@ function RoleBasedProfilePage() {
     return <RecruiterProfilePage />;
   }
   return <ProfilePage />;
+}
+
+function RoleBasedAnalyticsPage() {
+  const user = useAuthStore((state) => state.user);
+  if (user?.role === "recruiter" || user?.role === "admin") {
+    return <RecruiterAnalyticsPage />;
+  }
+  return <CandidateAnalyticsPage />;
 }
 
 export const router = createBrowserRouter([
@@ -209,6 +224,16 @@ export const router = createBrowserRouter([
           </AdminRoute>
         ),
       },
+      { path: "notifications", element: <NotificationsPage /> },
+      { path: "notification-settings", element: <NotificationSettingsPage /> },
+      {
+        path: "notification-monitoring",
+        element: (
+          <AdminRoute requiredPermission="notifications.read">
+            <AdminNotificationMonitoringPage />
+          </AdminRoute>
+        ),
+      },
       { path: "settings", element: <AdminSettingsPage /> },
     ],
   },
@@ -272,6 +297,22 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
             <CompanyApprovalPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "companies/:id/analytics",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <CompanyAnalyticsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "companies/:id/reports",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <ReportsCenterPage />
           </ProtectedRoute>
         ),
       },
@@ -438,6 +479,63 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={["candidate"]}>
             <CandidateInterviewDetailsPage />
+          </ProtectedRoute>
+        ),
+      },
+      { path: "notifications", element: <NotificationsPage /> },
+      { path: "notification-settings", element: <NotificationSettingsPage /> },
+      { path: "analytics", element: <RoleBasedAnalyticsPage /> },
+      {
+        path: "reports",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <ReportsCenterPage />
+          </ProtectedRoute>
+        ),
+      },
+    ],
+  },
+  {
+    element: (
+      <ProtectedRoute>
+        <DashboardLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { path: "/candidate/notifications", element: <NotificationsPage /> },
+      { path: "/candidate/notification-settings", element: <NotificationSettingsPage /> },
+      { path: "/candidate/analytics", element: <CandidateAnalyticsPage /> },
+      { path: "/recruiter/notifications", element: <NotificationsPage /> },
+      { path: "/recruiter/notification-settings", element: <NotificationSettingsPage /> },
+      {
+        path: "/recruiter/analytics",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <RecruiterAnalyticsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/recruiter/reports",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <ReportsCenterPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/company/:id/analytics",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <CompanyAnalyticsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/company/:id/reports",
+        element: (
+          <ProtectedRoute allowedRoles={["recruiter", "admin"]}>
+            <ReportsCenterPage />
           </ProtectedRoute>
         ),
       },
