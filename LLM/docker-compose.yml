@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai_internal
+
+  llm-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      - redis
+    networks:
+      - ai_internal
+
+  celery-resume-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: >
+      celery -A app.workers.celery_app:celery_app worker
+      -Q resume_processing_queue
+      -l info
+      --concurrency=4
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - ai_internal
+
+  celery-matching-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: >
+      celery -A app.workers.celery_app:celery_app worker
+      -Q ai_matching_queue
+      -l info
+      --concurrency=4
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - ai_internal
+
+volumes:
+  redis_data:
+
+networks:
+  ai_internal:
+    driver: bridge

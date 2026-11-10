@@ -15,5 +15,6 @@ router.use('/notifications', require('./modules/notifications/notifications.rout
 router.use('/analytics', require('./modules/analytics/analytics.routes'));
 router.use('/reports', require('./modules/reports/reports.routes'));
 router.use('/admin', require('./modules/admin/admin.routes'));
+router.use('/ai', require('./modules/ai/ai.routes'));
 
 module.exports = router;

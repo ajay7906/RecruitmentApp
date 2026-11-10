@@ -1,6 +1,7 @@
 const ApiError = require('../../utils/ApiError');
 const repo = require('./candidateData.repository');
 const resumeStorage = require('../../services/resumeStorage.service');
+const aiServiceClient = require('../../services/aiServiceClient');
 
 function toNumberOrNull(val) {
   if (val === null || val === undefined) return null;
@@ -397,6 +398,14 @@ exports.uploadResume = async (userId, payload) => {
     },
   });
 
+  await aiServiceClient.enqueueResumeProcessingEvent({
+    eventType: 'RESUME_UPLOADED',
+    resumeId: created.id,
+    candidateId: userId,
+    resumeVersion: created.version || 1,
+    storageKey: created.storageKey,
+    fileType: created.fileType,
+  }).catch(() => {});
   return formatResume(created);
 };
 
@@ -466,7 +475,19 @@ exports.replaceResume = async (userId, resumeId, payload) => {
     },
   });
 
+  await aiServiceClient
+    .enqueueResumeProcessingEvent({
+      eventType: 'RESUME_REPLACED',
+      resumeId: newVersion.id,
+      candidateId: userId,
+      resumeVersion: newVersion.version || 1,
+      storageKey: newVersion.storageKey,
+      fileType: newVersion.fileType,
+    })
+    .catch(() => {});
+
   const rootId = newVersion.rootResumeId || oldResume.id;
+
   const versionChain = await repo.findResumeVersionChain(rootId, userId);
 
   return {
