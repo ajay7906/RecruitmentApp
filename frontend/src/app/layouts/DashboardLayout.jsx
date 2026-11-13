@@ -125,48 +125,58 @@ export function DashboardLayout() {
     }
   }
 
-  const sidebar = (
-    <aside className="flex h-full flex-col border-r border-slate-200 bg-white">
-      <div className="flex h-16 items-center gap-2 border-b border-slate-100 px-5 text-lg font-bold text-ink">
-        <BriefcaseBusiness className="text-brand" size={21} /> Recruitro
+ const sidebar = (
+  <aside className="flex h-full flex-col overflow-hidden border-r border-slate-200 bg-white">
+    {/* Logo - Fixed at top */}
+    <div className="flex h-16 shrink-0 items-center gap-2 border-b border-slate-100 px-5 text-lg font-bold text-ink">
+      <BriefcaseBusiness className="text-brand" size={21} />
+      Recruitro
+    </div>
+
+    {/* Navigation - Scrollable */}
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+      <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        Workspace
+      </p>
+
+      <nav className="space-y-1">
+        {navItems.map(({ to, label, icon: Icon, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            onClick={() => setMobileOpen(false)}
+            className={({ isActive }) =>
+              `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                isActive
+                  ? "bg-blue-50 text-brand"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              }`
+            }
+          >
+            <Icon size={18} />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
+    </div>
+
+    {/* User & Logout - Fixed at bottom */}
+    <div className="shrink-0 border-t border-slate-100 bg-white p-4">
+      <div className="mb-3 truncate px-2 text-sm text-slate-500">
+        {user?.email || "Signed-in user"}
       </div>
-      <div className="px-4 py-5">
-        <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Workspace
-        </p>
-        <nav className="space-y-1">
-          {navItems.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                  isActive
-                    ? "bg-blue-50 text-brand"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`
-              }
-            >
-              <Icon size={18} /> {label}
-            </NavLink>
-          ))}
-        </nav>
-      </div>
-      <div className="mt-auto border-t border-slate-100 p-4">
-        <div className="mb-3 truncate px-2 text-sm text-slate-500">
-          {user?.email || "Signed-in user"}
-        </div>
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-        >
-          <LogOut size={18} /> Log out
-        </button>
-      </div>
-    </aside>
-  );
+
+      <button
+        onClick={handleLogout}
+        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+      >
+        <LogOut size={18} />
+        Log out
+      </button>
+    </div>
+  </aside>
+);
 
   return (
     <div className="min-h-screen bg-canvas">

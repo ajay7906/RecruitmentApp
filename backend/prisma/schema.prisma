@@ -179,8 +179,6 @@ enum RescheduleRequestStatus {
   @@map("reschedule_request_status")
 }
 
-
-
 enum ReportStatus {
   OPEN
   UNDER_REVIEW
@@ -230,7 +228,7 @@ model AdminRoleHistory {
   reason              String?
   createdAt           DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  @@index([userId, createdAt], map: "idx_admin_role_history_user")
+  @@index([userId, createdAt(sort: Desc)], map: "idx_admin_role_history_user")
   @@map("admin_role_history")
 }
 
@@ -243,7 +241,7 @@ model AccountStatusHistory {
   actorId        String?  @map("actor_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  @@index([userId, createdAt], map: "idx_account_status_history_user")
+  @@index([userId, createdAt(sort: Desc)], map: "idx_account_status_history_user")
   @@map("account_status_history")
 }
 
@@ -256,7 +254,7 @@ model CompanyStatusHistory {
   actorId        String?       @map("actor_id") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  @@index([companyId, createdAt], map: "idx_company_status_history_company")
+  @@index([companyId, createdAt(sort: Desc)], map: "idx_company_status_history_company")
   @@map("company_status_history")
 }
 
@@ -275,9 +273,9 @@ model AuditLog {
   userAgent     String?  @map("user_agent")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  @@index([createdAt], map: "idx_audit_logs_created_at")
-  @@index([actorId, createdAt], map: "idx_audit_logs_actor")
-  @@index([action, createdAt], map: "idx_audit_logs_action")
+  @@index([createdAt(sort: Desc)], map: "idx_audit_logs_created_at")
+  @@index([actorId, createdAt(sort: Desc)], map: "idx_audit_logs_actor")
+  @@index([action, createdAt(sort: Desc)], map: "idx_audit_logs_action")
   @@index([entityType, entityId], map: "idx_audit_logs_entity")
   @@map("audit_logs")
 }
@@ -300,7 +298,7 @@ model Report {
 
   notes ReportNote[]
 
-  @@index([status, createdAt], map: "idx_reports_status")
+  @@index([status, createdAt(sort: Desc)], map: "idx_reports_status")
   @@index([entityType, entityId], map: "idx_reports_entity")
   @@index([assignedTo], map: "idx_reports_assigned")
   @@map("reports")
@@ -320,64 +318,66 @@ model ReportNote {
 }
 
 model User {
-  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email           String     @unique // zod already lowercases it; see README note about citext
-  passwordHash    String?    @map("password_hash") // nullable: Google OAuth users later
-  fullName        String     @map("full_name")
-  role            UserRole   @default(candidate)
-  adminRole       AdminRole? @map("admin_role")
-  status          UserStatus @default(active)
-  lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz(6)
-  suspendedAt     DateTime?  @map("suspended_at") @db.Timestamptz(6)
-  suspendedById   String?    @map("suspended_by") @db.Uuid
-  suspensionReason String?   @map("suspension_reason")
-  statusChangedAt DateTime?  @map("status_changed_at") @db.Timestamptz(6)
-  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz(6)
-  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email            String     @unique @db.Citext
+  passwordHash     String?    @map("password_hash") // nullable: Google OAuth users later
+  fullName         String     @map("full_name")
+  role             UserRole   @default(candidate)
+  adminRole        AdminRole? @map("admin_role")
+  status           UserStatus @default(active)
+  lastLoginAt      DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  suspendedAt      DateTime?  @map("suspended_at") @db.Timestamptz(6)
+  suspendedById    String?    @map("suspended_by") @db.Uuid
+  suspensionReason String?    @map("suspension_reason")
+  statusChangedAt  DateTime?  @map("status_changed_at") @db.Timestamptz(6)
+  emailVerifiedAt  DateTime?  @map("email_verified_at") @db.Timestamptz(6)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  authTokens                AuthToken[]
-  refreshTokens             RefreshToken[]
-  candidateProfile          CandidateProfile?
-  recruiterProfile          RecruiterProfile?
-  ownedCompanies            Company[]                     @relation("CompanyOwner")
-  approvedCompanies         Company[]                     @relation("CompanyApprover")
-  companyMemberships        CompanyMembership[]
-  createdJobs               Job[]                         @relation("JobCreator")
-  updatedJobs               Job[]                         @relation("JobUpdater")
-  approvedJobs              Job[]                         @relation("JobApprover")
-  moderatedJobs             Job[]                         @relation("JobModerator")
-  jobModerationLogs         JobModerationLog[]            @relation("JobModerationActor")
-  jobReports                JobReport[]                   @relation("JobReporter")
-  candidateApplications     Application[]                 @relation("CandidateApplications")
-  reviewedApplications      Application[]                 @relation("RecruiterReviewedApplications")
-  applicationStatusChanges  ApplicationStatusHistory[]    @relation("ApplicationStatusChangedBy")
+  authTokens               AuthToken[]
+  refreshTokens            RefreshToken[]
+  candidateProfile         CandidateProfile?
+  recruiterProfile         RecruiterProfile?
+  ownedCompanies           Company[]                  @relation("CompanyOwner")
+  approvedCompanies        Company[]                  @relation("CompanyApprover")
+  companyMemberships       CompanyMembership[]
+  createdJobs              Job[]                      @relation("JobCreator")
+  updatedJobs              Job[]                      @relation("JobUpdater")
+  approvedJobs             Job[]                      @relation("JobApprover")
+  moderatedJobs            Job[]                      @relation("JobModerator")
+  jobModerationLogs        JobModerationLog[]         @relation("JobModerationActor")
+  jobReports               JobReport[]                @relation("JobReporter")
+  candidateApplications    Application[]              @relation("CandidateApplications")
+  reviewedApplications     Application[]              @relation("RecruiterReviewedApplications")
+  applicationStatusChanges ApplicationStatusHistory[] @relation("ApplicationStatusChangedBy")
 
-  candidateResumes          CandidateResume[]
-  candidateSkills           CandidateSkill[]
-  candidateEducations       CandidateEducation[]
-  candidateExperiences      CandidateExperience[]
-  candidateProjects         CandidateProject[]
-  candidateCertifications   CandidateCertification[]
-  candidateAchievements     CandidateAchievement[]
-  candidateLanguages        CandidateLanguage[]
+  candidateResumes        CandidateResume[]
+  candidateSkills         CandidateSkill[]
+  candidateEducations     CandidateEducation[]
+  candidateExperiences    CandidateExperience[]
+  candidateProjects       CandidateProject[]
+  candidateCertifications CandidateCertification[]
+  candidateAchievements   CandidateAchievement[]
+  candidateLanguages      CandidateLanguage[]
 
-  candidateInterviews       Interview[]                   @relation("CandidateInterviews")
-  createdInterviews         Interview[]                   @relation("InterviewCreator")
-  updatedInterviews         Interview[]                   @relation("InterviewUpdater")
-  cancelledInterviews       Interview[]                   @relation("InterviewCanceller")
-  interviewerAssignments    InterviewerAssignment[]       @relation("AssignedInterviewer")
-  assignedByInterviews      InterviewerAssignment[]       @relation("InterviewerAssignedBy")
-  interviewFeedbacks        InterviewFeedback[]           @relation("InterviewerFeedbacks")
-  interviewHistoryChanges   InterviewHistory[]            @relation("InterviewHistoryChangedBy")
-  rescheduleRequests        InterviewRescheduleRequest[]  @relation("CandidateRescheduleRequests")
-  reviewedRescheduleReqs    InterviewRescheduleRequest[]  @relation("RecruiterReviewedRescheduleRequests")
-  candidateHiringDecisions  HiringDecision[]              @relation("CandidateHiringDecisions")
-  madeHiringDecisions       HiringDecision[]              @relation("HiringDecisionMaker")
-  notifications             Notification[]
-  emailDeliveries           EmailDelivery[]
-  notificationPreferences   NotificationPreference[]
+  candidateInterviews      Interview[]                  @relation("CandidateInterviews")
+  createdInterviews        Interview[]                  @relation("InterviewCreator")
+  updatedInterviews        Interview[]                  @relation("InterviewUpdater")
+  cancelledInterviews      Interview[]                  @relation("InterviewCanceller")
+  interviewerAssignments   InterviewerAssignment[]      @relation("AssignedInterviewer")
+  assignedByInterviews     InterviewerAssignment[]      @relation("InterviewerAssignedBy")
+  interviewFeedbacks       InterviewFeedback[]          @relation("InterviewerFeedbacks")
+  interviewHistoryChanges  InterviewHistory[]           @relation("InterviewHistoryChangedBy")
+  rescheduleRequests       InterviewRescheduleRequest[] @relation("CandidateRescheduleRequests")
+  reviewedRescheduleReqs   InterviewRescheduleRequest[] @relation("RecruiterReviewedRescheduleRequests")
+  candidateHiringDecisions HiringDecision[]             @relation("CandidateHiringDecisions")
+  madeHiringDecisions      HiringDecision[]             @relation("HiringDecisionMaker")
+  notifications            Notification[]
+  emailDeliveries          EmailDelivery[]
+  notificationPreferences  NotificationPreference[]
 
+  @@index([createdAt], map: "idx_users_created_at")
+  @@index([role, status], map: "idx_users_role_status")
   @@map("users")
 }
 
@@ -673,6 +673,7 @@ model Company {
   @@index([ownerId], map: "idx_companies_owner_id")
   @@index([status], map: "idx_companies_status")
   @@index([name], map: "idx_companies_name")
+  @@index([createdAt], map: "idx_companies_created_at")
   @@map("companies")
 }
 
@@ -711,79 +712,79 @@ model RecruiterProfile {
 }
 
 model Job {
-  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title                    String    @map("job_title")
-  companyId                String    @map("company_id") @db.Uuid
-  createdById              String    @map("created_by") @db.Uuid
-  updatedById              String?   @map("updated_by") @db.Uuid
-  approvedById             String?   @map("approved_by") @db.Uuid
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String  @map("job_title")
+  companyId    String  @map("company_id") @db.Uuid
+  createdById  String  @map("created_by") @db.Uuid
+  updatedById  String? @map("updated_by") @db.Uuid
+  approvedById String? @map("approved_by") @db.Uuid
 
-  department               String?
-  category                 String?   @map("job_category")
-  description              String    @map("job_description")
-  summary                  String?   @map("job_summary")
-  numberOfOpenings         Int       @default(1) @map("number_of_openings")
-  employmentType           String    @map("employment_type")
-  workMode                 String    @map("work_mode")
+  department       String?
+  category         String? @map("job_category")
+  description      String  @map("job_description")
+  summary          String? @map("job_summary")
+  numberOfOpenings Int     @default(1) @map("number_of_openings")
+  employmentType   String  @map("employment_type")
+  workMode         String  @map("work_mode")
 
-  experienceLevel          String?   @map("experience_required")
-  minExperience            Decimal?  @default(0) @map("min_experience") @db.Decimal(4, 1)
-  maxExperience            Decimal?  @map("max_experience") @db.Decimal(4, 1)
+  experienceLevel String?  @map("experience_required")
+  minExperience   Decimal? @default(0) @map("min_experience") @db.Decimal(4, 1)
+  maxExperience   Decimal? @map("max_experience") @db.Decimal(4, 1)
 
-  minSalary                Decimal?  @map("min_salary") @db.Decimal(12, 2)
-  maxSalary                Decimal?  @map("max_salary") @db.Decimal(12, 2)
-  salaryCurrency           String    @default("INR") @map("salary_currency")
-  salaryPeriod             String    @default("Yearly") @map("salary_period")
-  discloseSalary           Boolean   @default(true) @map("disclose_salary")
+  minSalary      Decimal? @map("min_salary") @db.Decimal(12, 2)
+  maxSalary      Decimal? @map("max_salary") @db.Decimal(12, 2)
+  salaryCurrency String   @default("INR") @map("salary_currency")
+  salaryPeriod   String   @default("Yearly") @map("salary_period")
+  discloseSalary Boolean  @default(true) @map("disclose_salary")
 
-  country                  String?
-  state                    String?
-  city                     String?
-  officeLocation           String?   @map("office_location")
-  pincode                  String?
-  location                 String?
+  country        String?
+  state          String?
+  city           String?
+  officeLocation String? @map("office_location")
+  pincode        String?
+  location       String?
 
-  requiredSkills           String[]  @default([]) @map("required_skills")
-  preferredSkills          String[]  @default([]) @map("preferred_skills")
-  educationalQualification String?   @map("educational_qualification")
-  minEducationLevel        String?   @map("min_education_level")
-  preferredQualifications  String?   @map("preferred_qualifications")
-  requiredCertifications   String[]  @default([]) @map("required_certifications")
-  experienceDescription    String?   @map("experience_description")
-  additionalRequirements   String?   @map("additional_requirements")
+  requiredSkills           String[] @default([]) @map("required_skills")
+  preferredSkills          String[] @default([]) @map("preferred_skills")
+  educationalQualification String?  @map("educational_qualification")
+  minEducationLevel        String?  @map("min_education_level")
+  preferredQualifications  String?  @map("preferred_qualifications")
+  requiredCertifications   String[] @default([]) @map("required_certifications")
+  experienceDescription    String?  @map("experience_description")
+  additionalRequirements   String?  @map("additional_requirements")
 
-  responsibilities         String[]  @default([])
-  benefits                 String[]  @default([])
-  perks                    String[]  @default([])
-  additionalInfo           String?   @map("additional_info")
-  applicationInstructions  String?   @map("application_instructions")
-  contactEmail             String?   @map("contact_email")
+  responsibilities        String[] @default([])
+  benefits                String[] @default([])
+  perks                   String[] @default([])
+  additionalInfo          String?  @map("additional_info")
+  applicationInstructions String?  @map("application_instructions")
+  contactEmail            String?  @map("contact_email")
 
-  applicationDeadline      DateTime? @map("application_deadline") @db.Timestamptz(6)
-  allowAfterDeadline       Boolean   @default(false) @map("allow_after_deadline")
-  requireResume            Boolean   @default(true) @map("require_resume")
-  requireCoverLetter       Boolean   @default(false) @map("require_cover_letter")
-  maxApplications          Int?      @map("max_applications")
-  applicationQuestions     Json      @default("[]") @map("application_questions")
+  applicationDeadline  DateTime? @map("application_deadline") @db.Timestamptz(6)
+  allowAfterDeadline   Boolean   @default(false) @map("allow_after_deadline")
+  requireResume        Boolean   @default(true) @map("require_resume")
+  requireCoverLetter   Boolean   @default(false) @map("require_cover_letter")
+  maxApplications      Int?      @map("max_applications")
+  applicationQuestions Json      @default("[]") @map("application_questions")
 
-  status                   JobStatus           @default(DRAFT)
-  moderationStatus         JobModerationStatus @default(NOT_REVIEWED) @map("moderation_status")
-  moderationFlags          String[]            @default([]) @map("moderation_flags")
-  moderationScore          Int                 @default(0) @map("moderation_score")
-  moderationReason         String?             @map("moderation_reason")
-  moderatedAt              DateTime?           @map("moderated_at") @db.Timestamptz(6)
-  moderatedById            String?             @map("moderated_by") @db.Uuid
-  reportCount              Int                 @default(0) @map("report_count")
-  contentHash              String?             @map("content_hash")
-  requireAdminApproval     Boolean             @default(false) @map("require_admin_approval")
-  rejectionReason          String?             @map("rejection_reason")
-  submittedAt              DateTime?           @map("submitted_at") @db.Timestamptz(6)
-  publishedAt              DateTime?           @map("published_at") @db.Timestamptz(6)
-  pausedAt                 DateTime?           @map("paused_at") @db.Timestamptz(6)
-  closedAt                 DateTime?           @map("closed_at") @db.Timestamptz(6)
-  archivedAt               DateTime?           @map("archived_at") @db.Timestamptz(6)
-  createdAt                DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  status               JobStatus           @default(DRAFT)
+  moderationStatus     JobModerationStatus @default(NOT_REVIEWED) @map("moderation_status")
+  moderationFlags      String[]            @default([]) @map("moderation_flags")
+  moderationScore      Int                 @default(0) @map("moderation_score")
+  moderationReason     String?             @map("moderation_reason")
+  moderatedAt          DateTime?           @map("moderated_at") @db.Timestamptz(6)
+  moderatedById        String?             @map("moderated_by") @db.Uuid
+  reportCount          Int                 @default(0) @map("report_count")
+  contentHash          String?             @map("content_hash")
+  requireAdminApproval Boolean             @default(false) @map("require_admin_approval")
+  rejectionReason      String?             @map("rejection_reason")
+  submittedAt          DateTime?           @map("submitted_at") @db.Timestamptz(6)
+  publishedAt          DateTime?           @map("published_at") @db.Timestamptz(6)
+  pausedAt             DateTime?           @map("paused_at") @db.Timestamptz(6)
+  closedAt             DateTime?           @map("closed_at") @db.Timestamptz(6)
+  archivedAt           DateTime?           @map("archived_at") @db.Timestamptz(6)
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdBy       User               @relation("JobCreator", fields: [createdById], references: [id], onDelete: Restrict)
@@ -805,41 +806,43 @@ model Job {
   @@index([employmentType], map: "idx_jobs_employment_type")
   @@index([workMode], map: "idx_jobs_work_mode")
   @@index([publishedAt], map: "idx_jobs_published_at")
+  @@index([createdAt], map: "idx_jobs_created_at")
+  @@index([closedAt], map: "idx_jobs_closed_at")
   @@map("jobs")
 }
 
 model Application {
-  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  jobId                 String            @map("job_id") @db.Uuid
-  candidateId           String            @map("candidate_id") @db.Uuid
-  companyId             String            @map("company_id") @db.Uuid
-  reviewedById          String?           @map("reviewed_by") @db.Uuid
-  resumeId              String?           @map("resume_id") @db.Uuid
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId        String  @map("job_id") @db.Uuid
+  candidateId  String  @map("candidate_id") @db.Uuid
+  companyId    String  @map("company_id") @db.Uuid
+  reviewedById String? @map("reviewed_by") @db.Uuid
+  resumeId     String? @map("resume_id") @db.Uuid
 
-  resumeKey             String?           @map("resume_key")
-  resumeFileName        String?           @map("resume_file_name")
-  resumeMimeType        String?           @map("resume_mime_type")
-  resumeFileSize        Int?              @map("resume_file_size")
+  resumeKey      String? @map("resume_key")
+  resumeFileName String? @map("resume_file_name")
+  resumeMimeType String? @map("resume_mime_type")
+  resumeFileSize Int?    @map("resume_file_size")
 
-  coverLetter           String?           @map("cover_letter")
-  answers               Json              @default("[]")
-  additionalInformation String?           @map("additional_information")
+  coverLetter           String? @map("cover_letter")
+  answers               Json    @default("[]")
+  additionalInformation String? @map("additional_information")
 
-  candidateSkills       String[]          @default([]) @map("candidate_skills")
-  candidateExperience   Decimal?          @map("candidate_experience") @db.Decimal(4, 1)
-  candidateSnapshot     Json              @default("{}") @map("candidate_snapshot")
-  jobSnapshot           Json              @default("{}") @map("job_snapshot")
+  candidateSkills     String[] @default([]) @map("candidate_skills")
+  candidateExperience Decimal? @map("candidate_experience") @db.Decimal(4, 1)
+  candidateSnapshot   Json     @default("{}") @map("candidate_snapshot")
+  jobSnapshot         Json     @default("{}") @map("job_snapshot")
 
-  status                ApplicationStatus @default(SUBMITTED)
-  appliedAt             DateTime          @default(now()) @map("applied_at") @db.Timestamptz(6)
-  lastStatusUpdatedAt   DateTime          @default(now()) @map("last_status_updated_at") @db.Timestamptz(6)
-  withdrawnAt           DateTime?         @map("withdrawn_at") @db.Timestamptz(6)
-  withdrawalReason      String?           @map("withdrawal_reason")
-  rejectionReason       String?           @map("rejection_reason")
-  recruiterNotes        Json              @default("[]") @map("recruiter_notes")
+  status              ApplicationStatus @default(SUBMITTED)
+  appliedAt           DateTime          @default(now()) @map("applied_at") @db.Timestamptz(6)
+  lastStatusUpdatedAt DateTime          @default(now()) @map("last_status_updated_at") @db.Timestamptz(6)
+  withdrawnAt         DateTime?         @map("withdrawn_at") @db.Timestamptz(6)
+  withdrawalReason    String?           @map("withdrawal_reason")
+  rejectionReason     String?           @map("rejection_reason")
+  recruiterNotes      Json              @default("[]") @map("recruiter_notes")
 
-  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   job             Job                        @relation(fields: [jobId], references: [id], onDelete: Cascade)
   candidate       User                       @relation("CandidateApplications", fields: [candidateId], references: [id], onDelete: Cascade)
@@ -876,54 +879,55 @@ model ApplicationStatusHistory {
 
   @@index([applicationId], map: "idx_app_status_history_application_id")
   @@index([changedAt], map: "idx_app_status_history_changed_at")
+  @@index([newStatus, changedAt], map: "idx_app_status_history_new_status")
   @@map("application_status_history")
 }
 
 model Interview {
-  id                       String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  applicationId            String          @map("application_id") @db.Uuid
-  jobId                    String          @map("job_id") @db.Uuid
-  candidateId              String          @map("candidate_id") @db.Uuid
-  companyId                String          @map("company_id") @db.Uuid
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId String @map("application_id") @db.Uuid
+  jobId         String @map("job_id") @db.Uuid
+  candidateId   String @map("candidate_id") @db.Uuid
+  companyId     String @map("company_id") @db.Uuid
 
-  title                    String          @map("interview_title")
-  roundNumber              Int             @default(1) @map("round_number")
-  interviewType            String          @map("interview_type")
-  interviewMode            InterviewMode   @default(ONLINE) @map("interview_mode")
+  title         String        @map("interview_title")
+  roundNumber   Int           @default(1) @map("round_number")
+  interviewType String        @map("interview_type")
+  interviewMode InterviewMode @default(ONLINE) @map("interview_mode")
 
-  interviewDate            DateTime        @map("interview_date") @db.Timestamptz(6)
-  startTime                DateTime        @map("start_time") @db.Timestamptz(6)
-  endTime                  DateTime        @map("end_time") @db.Timestamptz(6)
-  timeZone                 String          @default("Asia/Kolkata") @map("time_zone")
+  interviewDate DateTime @map("interview_date") @db.Timestamptz(6)
+  startTime     DateTime @map("start_time") @db.Timestamptz(6)
+  endTime       DateTime @map("end_time") @db.Timestamptz(6)
+  timeZone      String   @default("Asia/Kolkata") @map("time_zone")
 
   location                 String?
-  meetingLink              String?         @map("meeting_link")
+  meetingLink              String? @map("meeting_link")
   description              String?
   instructions             String?
-  allowCandidateReschedule Boolean         @default(true) @map("allow_candidate_reschedule")
+  allowCandidateReschedule Boolean @default(true) @map("allow_candidate_reschedule")
 
-  status                   InterviewStatus @default(SCHEDULED)
-  candidateConfirmedAt     DateTime?       @map("candidate_confirmed_at") @db.Timestamptz(6)
-  noShowParty              String?         @map("no_show_party")
+  status               InterviewStatus @default(SCHEDULED)
+  candidateConfirmedAt DateTime?       @map("candidate_confirmed_at") @db.Timestamptz(6)
+  noShowParty          String?         @map("no_show_party")
 
-  cancellationReason       String?         @map("cancellation_reason")
-  cancellationType         String?         @map("cancellation_type")
-  cancelledById            String?         @map("cancelled_by") @db.Uuid
-  cancelledAt              DateTime?       @map("cancelled_at") @db.Timestamptz(6)
+  cancellationReason String?   @map("cancellation_reason")
+  cancellationType   String?   @map("cancellation_type")
+  cancelledById      String?   @map("cancelled_by") @db.Uuid
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
 
-  createdById              String          @map("created_by") @db.Uuid
-  updatedById              String?         @map("updated_by") @db.Uuid
-  completedAt              DateTime?       @map("completed_at") @db.Timestamptz(6)
-  createdAt                DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdById String    @map("created_by") @db.Uuid
+  updatedById String?   @map("updated_by") @db.Uuid
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  application        Application                  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  job                Job                          @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  candidate          User                         @relation("CandidateInterviews", fields: [candidateId], references: [id], onDelete: Cascade)
-  company            Company                      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdBy          User                         @relation("InterviewCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy          User?                        @relation("InterviewUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
-  cancelledBy        User?                        @relation("InterviewCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  job         Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate   User        @relation("CandidateInterviews", fields: [candidateId], references: [id], onDelete: Cascade)
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy   User        @relation("InterviewCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy   User?       @relation("InterviewUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  cancelledBy User?       @relation("InterviewCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
 
   interviewers       InterviewerAssignment[]
   feedbacks          InterviewFeedback[]
@@ -936,6 +940,7 @@ model Interview {
   @@index([jobId], map: "idx_interviews_job_id")
   @@index([status], map: "idx_interviews_status")
   @@index([startTime], map: "idx_interviews_start_time")
+  @@index([createdAt], map: "idx_interviews_created_at")
   @@map("interviews")
 }
 
@@ -961,25 +966,25 @@ model InterviewerAssignment {
 }
 
 model InterviewFeedback {
-  id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  interviewId           String                 @map("interview_id") @db.Uuid
-  applicationId         String                 @map("application_id") @db.Uuid
-  interviewerId         String                 @map("interviewer_id") @db.Uuid
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  interviewId   String @map("interview_id") @db.Uuid
+  applicationId String @map("application_id") @db.Uuid
+  interviewerId String @map("interviewer_id") @db.Uuid
 
-  overallRating         Int                    @map("overall_rating")
-  technicalRating       Int?                   @map("technical_rating")
-  communicationRating   Int?                   @map("communication_rating")
-  problemSolvingRating  Int?                   @map("problem_solving_rating")
-  experienceRating      Int?                   @map("experience_rating")
+  overallRating        Int  @map("overall_rating")
+  technicalRating      Int? @map("technical_rating")
+  communicationRating  Int? @map("communication_rating")
+  problemSolvingRating Int? @map("problem_solving_rating")
+  experienceRating     Int? @map("experience_rating")
 
-  strengths             String?
-  weaknesses            String?
-  detailedFeedback      String                 @map("detailed_feedback")
-  recommendation        FeedbackRecommendation
-  isFinalSubmitted      Boolean                @default(true) @map("is_final_submitted")
+  strengths        String?
+  weaknesses       String?
+  detailedFeedback String                 @map("detailed_feedback")
+  recommendation   FeedbackRecommendation
+  isFinalSubmitted Boolean                @default(true) @map("is_final_submitted")
 
-  submittedAt           DateTime               @default(now()) @map("submitted_at") @db.Timestamptz(6)
-  updatedAt             DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  submittedAt DateTime @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   interview   Interview   @relation(fields: [interviewId], references: [id], onDelete: Cascade)
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -1060,6 +1065,7 @@ model HiringDecision {
   @@index([applicationId], map: "idx_hiring_decisions_application")
   @@index([companyId], map: "idx_hiring_decisions_company")
   @@index([jobId], map: "idx_hiring_decisions_job")
+  @@index([decidedAt], map: "idx_hiring_decisions_decided_at")
   @@map("hiring_decisions")
 }
 
@@ -1082,7 +1088,7 @@ model JobModerationLog {
   actor User? @relation("JobModerationActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([jobId], map: "idx_job_moderation_logs_job")
-  @@index([createdAt], map: "idx_job_moderation_logs_created_at")
+  @@index([createdAt(sort: Desc)], map: "idx_job_moderation_logs_created_at")
   @@map("job_moderation_logs")
 }
 
@@ -1175,10 +1181,10 @@ model Notification {
 
   recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
 
-  @@index([recipientId, isDismissed, createdAt], map: "idx_notifications_recipient_created")
+  @@index([recipientId, isDismissed, createdAt(sort: Desc)], map: "idx_notifications_recipient_created")
   @@index([recipientId, isRead, isDismissed], map: "idx_notifications_recipient_unread")
-  @@index([recipientId, category, createdAt], map: "idx_notifications_recipient_category")
-  @@index([eventType, createdAt], map: "idx_notifications_event_type")
+  @@index([recipientId, category, createdAt(sort: Desc)], map: "idx_notifications_recipient_category")
+  @@index([eventType, createdAt(sort: Desc)], map: "idx_notifications_event_type")
   @@map("notifications")
 }
 
@@ -1213,10 +1219,10 @@ model EmailDelivery {
   recipient User?                 @relation(fields: [recipientId], references: [id], onDelete: SetNull)
   template  NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
-  @@index([status, nextRetryAt, createdAt], map: "idx_email_deliveries_status_retry")
-  @@index([recipientId, createdAt], map: "idx_email_deliveries_recipient")
-  @@index([eventType, createdAt], map: "idx_email_deliveries_event_type")
-  @@index([createdAt], map: "idx_email_deliveries_created_at")
+  @@index([status, nextRetryAt, createdAt(sort: Desc)], map: "idx_email_deliveries_status_retry")
+  @@index([recipientId, createdAt(sort: Desc)], map: "idx_email_deliveries_recipient")
+  @@index([eventType, createdAt(sort: Desc)], map: "idx_email_deliveries_event_type")
+  @@index([createdAt(sort: Desc)], map: "idx_email_deliveries_created_at")
   @@map("email_deliveries")
 }
 

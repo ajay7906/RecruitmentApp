@@ -3,7 +3,14 @@
 -- Shared PostgreSQL database between Node.js (public schema) & Python AI (`ai` schema)
 -- =============================================================================
 
-CREATE EXTENSION IF NOT EXISTS vector;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'vector') THEN
+    CREATE EXTENSION IF NOT EXISTS vector;
+  ELSE
+    RAISE NOTICE 'pgvector extension not installed in this PostgreSQL instance - skipping vector extension creation';
+  END IF;
+END $$;
 CREATE SCHEMA IF NOT EXISTS ai;
 
 -- -----------------------------------------------------------------------------
@@ -113,23 +120,48 @@ CREATE INDEX IF NOT EXISTS idx_ai_candidate_profiles_skills_gin
 -- 4. ai.candidate_embeddings
 -- Multi-type vector embeddings for semantic candidate search via pgvector
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ai.candidate_embeddings (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  candidate_id      UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  resume_id         UUID REFERENCES public.candidate_resumes(id) ON DELETE CASCADE,
-  resume_version    INTEGER NOT NULL DEFAULT 1,
-  content_hash      VARCHAR(64) NOT NULL,
-  embedding_type    VARCHAR(32) NOT NULL DEFAULT 'FULL_PROFILE'
-                    CHECK (embedding_type IN ('FULL_PROFILE', 'SKILLS', 'EXPERIENCE', 'PROJECTS')),
-  model_name        VARCHAR(64) NOT NULL,
-  dimension         INTEGER NOT NULL DEFAULT 768,
-  embedding         vector(768) NOT NULL,
-  source_text_hash  VARCHAR(64) NOT NULL,
-  is_active         BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_ai_candidate_embedding_ver UNIQUE (candidate_id, resume_version, embedding_type, model_name)
-);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'vector') THEN
+    EXECUTE '
+      CREATE TABLE IF NOT EXISTS ai.candidate_embeddings (
+        id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        candidate_id      UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        resume_id         UUID REFERENCES public.candidate_resumes(id) ON DELETE CASCADE,
+        resume_version    INTEGER NOT NULL DEFAULT 1,
+        content_hash      VARCHAR(64) NOT NULL,
+        embedding_type    VARCHAR(32) NOT NULL DEFAULT ''FULL_PROFILE''
+                          CHECK (embedding_type IN (''FULL_PROFILE'', ''SKILLS'', ''EXPERIENCE'', ''PROJECTS'')),
+        model_name        VARCHAR(64) NOT NULL,
+        dimension         INTEGER NOT NULL DEFAULT 768,
+        embedding         vector(768) NOT NULL,
+        source_text_hash  VARCHAR(64) NOT NULL,
+        is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT uq_ai_candidate_embedding_ver UNIQUE (candidate_id, resume_version, embedding_type, model_name)
+      )';
+  ELSE
+    EXECUTE '
+      CREATE TABLE IF NOT EXISTS ai.candidate_embeddings (
+        id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        candidate_id      UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        resume_id         UUID REFERENCES public.candidate_resumes(id) ON DELETE CASCADE,
+        resume_version    INTEGER NOT NULL DEFAULT 1,
+        content_hash      VARCHAR(64) NOT NULL,
+        embedding_type    VARCHAR(32) NOT NULL DEFAULT ''FULL_PROFILE''
+                          CHECK (embedding_type IN (''FULL_PROFILE'', ''SKILLS'', ''EXPERIENCE'', ''PROJECTS'')),
+        model_name        VARCHAR(64) NOT NULL,
+        dimension         INTEGER NOT NULL DEFAULT 768,
+        embedding         JSONB NOT NULL DEFAULT ''[]''::jsonb,
+        source_text_hash  VARCHAR(64) NOT NULL,
+        is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT uq_ai_candidate_embedding_ver UNIQUE (candidate_id, resume_version, embedding_type, model_name)
+      )';
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_ai_candidate_embeddings_active
   ON ai.candidate_embeddings (candidate_id, embedding_type, is_active);
@@ -138,22 +170,46 @@ CREATE INDEX IF NOT EXISTS idx_ai_candidate_embeddings_active
 -- 5. ai.job_embeddings
 -- Job description & requirement vector embeddings with version tracking
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ai.job_embeddings (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  job_id            UUID NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
-  company_id        UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
-  job_version       VARCHAR(64) NOT NULL,
-  embedding_type    VARCHAR(32) NOT NULL DEFAULT 'FULL_JOB'
-                    CHECK (embedding_type IN ('FULL_JOB', 'DESCRIPTION', 'REQUIREMENTS')),
-  model_name        VARCHAR(64) NOT NULL,
-  dimension         INTEGER NOT NULL DEFAULT 768,
-  embedding         vector(768) NOT NULL,
-  normalized_skills JSONB NOT NULL DEFAULT '[]'::jsonb,
-  is_active         BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_ai_job_embedding_ver UNIQUE (job_id, job_version, embedding_type, model_name)
-);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'vector') THEN
+    EXECUTE '
+      CREATE TABLE IF NOT EXISTS ai.job_embeddings (
+        id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_id            UUID NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+        company_id        UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+        job_version       VARCHAR(64) NOT NULL,
+        embedding_type    VARCHAR(32) NOT NULL DEFAULT ''FULL_JOB''
+                          CHECK (embedding_type IN (''FULL_JOB'', ''DESCRIPTION'', ''REQUIREMENTS'')),
+        model_name        VARCHAR(64) NOT NULL,
+        dimension         INTEGER NOT NULL DEFAULT 768,
+        embedding         vector(768) NOT NULL,
+        normalized_skills JSONB NOT NULL DEFAULT ''[]''::jsonb,
+        is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT uq_ai_job_embedding_ver UNIQUE (job_id, job_version, embedding_type, model_name)
+      )';
+  ELSE
+    EXECUTE '
+      CREATE TABLE IF NOT EXISTS ai.job_embeddings (
+        id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_id            UUID NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+        company_id        UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+        job_version       VARCHAR(64) NOT NULL,
+        embedding_type    VARCHAR(32) NOT NULL DEFAULT ''FULL_JOB''
+                          CHECK (embedding_type IN (''FULL_JOB'', ''DESCRIPTION'', ''REQUIREMENTS'')),
+        model_name        VARCHAR(64) NOT NULL,
+        dimension         INTEGER NOT NULL DEFAULT 768,
+        embedding         JSONB NOT NULL DEFAULT ''[]''::jsonb,
+        normalized_skills JSONB NOT NULL DEFAULT ''[]''::jsonb,
+        is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT uq_ai_job_embedding_ver UNIQUE (job_id, job_version, embedding_type, model_name)
+      )';
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_ai_job_embeddings_active
   ON ai.job_embeddings (job_id, embedding_type, is_active);
