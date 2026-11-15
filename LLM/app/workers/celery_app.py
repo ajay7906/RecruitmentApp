@@ -1,6 +1,7 @@
 from celery import Celery
 from kombu import Queue
 
+import app.core.pgvector_patch  # Ensures pgvector result processor safely handles list results
 from app.core.config import get_settings
 
 settings = get_settings()

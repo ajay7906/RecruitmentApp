@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import uuid
+import app.core.pgvector_patch  # Ensures pgvector result processor safely handles list results
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,

@@ -16,6 +16,8 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   MAIL_FROM: z.string().default('Recruit <no-reply@recruit.local>'),
+  AI_SERVICE_URL: z.string().optional(),
+  INTERNAL_API_SECRET: z.string().optional(),
 });
 
 module.exports = schema.parse(process.env);

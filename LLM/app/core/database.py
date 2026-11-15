@@ -7,6 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import NullPool
 from app.core.config import get_settings, reload_settings
 from app.core.logging import logger
+import app.core.pgvector_patch  # Ensures pgvector result processor safely handles list results
 
 
 class Base(DeclarativeBase):

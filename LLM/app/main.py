@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+import app.core.pgvector_patch  # Ensures pgvector result processor safely handles list results
 from app.api.v1.matching_routes import router as matching_router
 from app.api.v1.ranking_routes import router as ranking_router
 from app.api.v1.recommendation_routes import router as recommendation_router
