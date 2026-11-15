@@ -120,6 +120,167 @@ class ScoringService:
         score = base + (overlap["match_ratio"] * 55.0)
         return round(min(100.0, max(0.0, score)), 2)
 
+    def compute_education_score(
+        self,
+        *,
+        education_entries: List[Dict[str, Any]],
+        min_education_level: Optional[str] = None,
+        educational_qualification: Optional[str] = None,
+    ) -> float:
+        """
+        Computes education match score (0 - 100).
+        Evaluates candidate's degrees against job requirements.
+        """
+        if not education_entries:
+            return 60.0 if not (min_education_level or educational_qualification) else 40.0
+
+        level_map = {
+            "doctorate": 5, "phd": 5, "ph.d": 5, "doctor": 5, "philosophy": 5,
+            "master": 4, "masters": 4, "postgraduate": 4, "ms": 4, "mtech": 4, "m.tech": 4, "mba": 4, "mca": 4,
+            "bachelor": 3, "bachelors": 3, "undergraduate": 3, "bs": 3, "btech": 3, "b.tech": 3, "be": 3, "b.e": 3, "bca": 3, "ba": 3, "bsc": 3,
+            "diploma": 2, "associate": 2,
+            "high_school": 1, "secondary": 1, "12th": 1, "10th": 1,
+        }
+
+        req_level = 3  # default bachelor if unspecified
+        req_text = f"{min_education_level or ''} {educational_qualification or ''}".lower()
+        for kw, lvl in level_map.items():
+            if kw in req_text:
+                req_level = max(req_level, lvl)
+                break
+
+        highest_cand_level = 0
+        cand_text = ""
+        for entry in education_entries:
+            deg = str(entry.get("degree") or "").lower()
+            field = str(entry.get("field_of_study") or entry.get("field") or "").lower()
+            cand_text += f" {deg} {field}"
+            for kw, lvl in level_map.items():
+                if kw in deg or kw in field:
+                    highest_cand_level = max(highest_cand_level, lvl)
+
+        if highest_cand_level == 0:
+            highest_cand_level = 3 if ("degree" in cand_text or "university" in cand_text) else 2
+
+        if highest_cand_level >= req_level:
+            return 100.0
+        elif highest_cand_level == req_level - 1:
+            return 80.0
+        else:
+            return 60.0
+
+    def compute_certifications_score(
+        self,
+        *,
+        certifications: List[Dict[str, Any]],
+        required_certifications: Optional[List[str]] = None,
+        target_skills: Optional[List[str]] = None,
+    ) -> float:
+        """
+        Computes certifications match score (0 - 100).
+        """
+        req_certs = [c.strip().lower() for c in (required_certifications or []) if c.strip()]
+        cand_cert_names = [
+            str(c.get("certification_name") or c.get("name") or "").strip().lower()
+            for c in (certifications or [])
+        ]
+
+        if req_certs:
+            matched = sum(
+                1 for rc in req_certs
+                if any(rc in cc or cc in rc for cc in cand_cert_names)
+            )
+            ratio = matched / len(req_certs)
+            return round(ratio * 100.0, 2)
+
+        if not certifications:
+            return 70.0
+
+        # Bonus if certifications match any technical skills
+        norm_targets = [s.lower() for s in (target_skills or [])]
+        skill_matched = sum(
+            1 for cc in cand_cert_names
+            if any(ts in cc for ts in norm_targets)
+        )
+        if skill_matched > 0:
+            return round(min(100.0, 85.0 + (skill_matched * 5.0)), 2)
+
+        return round(min(90.0, 75.0 + (len(certifications) * 5.0)), 2)
+
+    def compute_jd_alignment_score(
+        self,
+        *,
+        similarity_score: float,
+        llm_score: Optional[float] = None,
+    ) -> float:
+        """
+        Combines vector semantic similarity and structured LLM evaluation evidence alignment.
+        """
+        sem = max(0.0, min(100.0, float(similarity_score or 0.0)))
+        if llm_score is not None:
+            llm = max(0.0, min(100.0, float(llm_score)))
+            return round((sem * 0.40) + (llm * 0.60), 2)
+        return sem
+
+    def compute_location_preference_score(
+        self,
+        *,
+        candidate_location: Optional[str],
+        preferred_locations: List[str],
+        job_location: Optional[str],
+        job_work_mode: Optional[str],
+    ) -> float:
+        """
+        Location preference score (0 - 100).
+        100% for REMOTE jobs.
+        100% for exact location match.
+        """
+        if (job_work_mode or "").upper() == "REMOTE":
+            return 100.0
+
+        if not job_location:
+            return 85.0
+
+        norm_job_loc = job_location.lower().strip()
+        all_candidate_locs = [
+            loc.lower().strip()
+            for loc in ([candidate_location] if candidate_location else []) + (preferred_locations or [])
+            if loc and loc.strip()
+        ]
+
+        if not all_candidate_locs:
+            return 75.0  # candidate didn't specify strict preference
+
+        for cloc in all_candidate_locs:
+            if cloc in norm_job_loc or norm_job_loc in cloc:
+                return 100.0
+
+        # Partial city/state tokens
+        job_tokens = set(norm_job_loc.replace(",", " ").split())
+        for cloc in all_candidate_locs:
+            cand_tokens = set(cloc.replace(",", " ").split())
+            if job_tokens.intersection(cand_tokens):
+                return 80.0
+
+        return 40.0
+
+    def compute_employment_type_score(
+        self,
+        *,
+        candidate_preferred_type: Optional[str],
+        job_employment_type: Optional[str],
+    ) -> float:
+        """
+        Employment type preference score (0 - 100).
+        """
+        if not candidate_preferred_type or not job_employment_type:
+            return 85.0
+        pref = candidate_preferred_type.upper().replace("-", "_").replace(" ", "_")
+        job_type = job_employment_type.upper().replace("-", "_").replace(" ", "_")
+        if pref == job_type:
+            return 100.0
+        return 50.0
+
     def compute_final_weighted_score(
         self,
         *,
@@ -127,32 +288,110 @@ class ScoringService:
         experience_score: float,
         similarity_score: float,
         project_score: float,
-        llm_score: Optional[float],
-        weights: ScoringWeightsConfig,
+        llm_score: Optional[float] = None,
+        education_score: Optional[float] = None,
+        certifications_score: Optional[float] = None,
+        jd_alignment_score: Optional[float] = None,
+        weights: Optional[ScoringWeightsConfig] = None,
     ) -> float:
-        w_skill = max(0.0, float(weights.skill_weight))
-        w_exp = max(0.0, float(weights.experience_weight))
-        w_sem = max(0.0, float(weights.semantic_weight))
-        w_llm = max(0.0, float(weights.llm_weight))
-        w_proj = max(0.0, float(weights.project_weight))
+        """
+        Calculates final deterministic recruiter score based on specification:
+        - Skills Match: 40%
+        - Relevant Experience: 25%
+        - Project Relevance: 15%
+        - Education Match: 10%
+        - Certifications: 5%
+        - Job Description Alignment: 5%
+        """
+        if weights is None:
+            weights = ScoringWeightsConfig()
 
-        effective_llm = float(llm_score) if llm_score is not None else (
-            (skill_score * 0.45) + (experience_score * 0.25) + (similarity_score * 0.20) + (project_score * 0.10)
+        edu = education_score if education_score is not None else 80.0
+        cert = certifications_score if certifications_score is not None else 75.0
+        jd = jd_alignment_score if jd_alignment_score is not None else (
+            self.compute_jd_alignment_score(similarity_score=similarity_score, llm_score=llm_score)
         )
 
-        total_weight = w_skill + w_exp + w_sem + w_llm + w_proj
+        # Check if caller supplied legacy weights
+        has_legacy = any([
+            weights.skill_weight is not None,
+            weights.experience_weight is not None,
+            weights.semantic_weight is not None,
+            weights.llm_weight is not None,
+            weights.project_weight is not None,
+        ])
+
+        if has_legacy:
+            w_skill = max(0.0, float(weights.skill_weight if weights.skill_weight is not None else 0.35))
+            w_exp = max(0.0, float(weights.experience_weight if weights.experience_weight is not None else 0.20))
+            w_sem = max(0.0, float(weights.semantic_weight if weights.semantic_weight is not None else 0.20))
+            w_llm = max(0.0, float(weights.llm_weight if weights.llm_weight is not None else 0.15))
+            w_proj = max(0.0, float(weights.project_weight if weights.project_weight is not None else 0.10))
+
+            effective_llm = float(llm_score) if llm_score is not None else jd
+            total = w_skill + w_exp + w_sem + w_llm + w_proj
+            if total <= 0:
+                total = 1.0
+            score = (
+                (float(skill_score) * w_skill)
+                + (float(experience_score) * w_exp)
+                + (float(similarity_score) * w_sem)
+                + (effective_llm * w_llm)
+                + (float(project_score) * w_proj)
+            ) / total
+            return round(min(100.0, max(0.0, score)), 2)
+
+        # Specification 6-criteria Recruiter Weights
+        w_skills = max(0.0, float(weights.skills_match_weight))
+        w_exp = max(0.0, float(weights.relevant_experience_weight))
+        w_proj = max(0.0, float(weights.project_relevance_weight))
+        w_edu = max(0.0, float(weights.education_match_weight))
+        w_cert = max(0.0, float(weights.certifications_weight))
+        w_jd = max(0.0, float(weights.jd_alignment_weight))
+
+        total_weight = w_skills + w_exp + w_proj + w_edu + w_cert + w_jd
         if total_weight <= 0.0:
             total_weight = 1.0
-            w_skill, w_exp, w_sem, w_llm, w_proj = 0.35, 0.20, 0.20, 0.15, 0.10
 
         weighted_sum = (
-            (float(skill_score) * w_skill)
+            (float(skill_score) * w_skills)
             + (float(experience_score) * w_exp)
-            + (float(similarity_score) * w_sem)
-            + (effective_llm * w_llm)
             + (float(project_score) * w_proj)
+            + (float(edu) * w_edu)
+            + (float(cert) * w_cert)
+            + (float(jd) * w_jd)
         )
         final = weighted_sum / total_weight
+        return round(min(100.0, max(0.0, final)), 2)
+
+    def compute_candidate_job_score(
+        self,
+        *,
+        skill_score: float,
+        experience_score: float,
+        jd_relevance_score: float,
+        location_score: float,
+        education_score: float,
+        employment_type_score: float,
+    ) -> float:
+        """
+        Specification Candidate Recommendation Weights:
+        - Skills Match: 40%
+        - Experience Match: 25%
+        - Job Description Relevance: 15%
+        - Location Preference: 10%
+        - Education Match: 5%
+        - Employment Type Preference: 5%
+        Total: 100%
+        """
+        final = (
+            (float(skill_score) * 0.40)
+            + (float(experience_score) * 0.25)
+            + (float(jd_relevance_score) * 0.15)
+            + (float(location_score) * 0.10)
+            + (float(education_score) * 0.05)
+            + (float(employment_type_score) * 0.05)
+        )
         return round(min(100.0, max(0.0, final)), 2)
 
     @staticmethod

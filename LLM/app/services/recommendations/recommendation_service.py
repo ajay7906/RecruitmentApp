@@ -93,9 +93,16 @@ class RecommendationService:
                       u.full_name,
                       cp.headline,
                       cp.bio AS summary,
+                      cp.career_summary,
                       cp.skills,
                       cp.years_of_experience,
-                      cp.location AS current_location
+                      cp.location AS current_location,
+                      cp.city,
+                      cp.state,
+                      cp.preferred_locations,
+                      cp.preferred_employment_type,
+                      cp.preferred_work_mode,
+                      cp.expected_salary
                     FROM public.users u
                     LEFT JOIN public.candidate_profiles cp ON cp.user_id = u.id
                     WHERE u.id = :cid
@@ -131,10 +138,29 @@ class RecommendationService:
             else (pub_row["years_of_experience"] if pub_row and pub_row.get("years_of_experience") is not None else 0.0)
         )
         summary = (
-            (pub_row["summary"] if pub_row else None)
+            (pub_row["career_summary"] if pub_row and pub_row.get("career_summary") else None)
+            or (pub_row["summary"] if pub_row else None)
             or (pub_row["headline"] if pub_row else "")
             or ""
         )
+
+        education_entries = (ai_profile.education if ai_profile else []) or []
+        if not education_entries:
+            try:
+                edu_rows = db.execute(
+                    text(
+                        "SELECT degree, field_of_study, institution_name, education_level "
+                        "FROM public.candidate_education WHERE candidate_id = :cid"
+                    ),
+                    {"cid": str(candidate_id)},
+                ).mappings().all()
+                education_entries = [dict(r) for r in edu_rows]
+            except Exception:
+                pass
+
+        pref_locs = pub_row.get("preferred_locations") if pub_row else []
+        if not isinstance(pref_locs, list):
+            pref_locs = list(pref_locs or [])
 
         candidate_vector: List[float] = []
         if ai_profile:
@@ -176,6 +202,12 @@ class RecommendationService:
             "professional_summary": summary,
             "normalized_skills": skills,
             "total_experience_years": exp_years,
+            "current_location": (pub_row.get("current_location") if pub_row else None) or (ai_profile.location if ai_profile else None),
+            "preferred_locations": pref_locs,
+            "preferred_employment_type": pub_row.get("preferred_employment_type") if pub_row else None,
+            "preferred_work_mode": pub_row.get("preferred_work_mode") if pub_row else None,
+            "expected_salary": pub_row.get("expected_salary") if pub_row else None,
+            "education": education_entries,
             "candidate_vector": candidate_vector,
         }
 
@@ -198,15 +230,23 @@ class RecommendationService:
                       j.id AS job_id,
                       j.company_id,
                       c.name AS company_name,
+                      c.logo_url AS company_logo,
                       j.job_title,
                       j.job_description,
                       j.required_skills,
                       j.preferred_skills,
                       j.min_experience,
                       j.max_experience,
+                      j.experience_required,
+                      j.min_salary,
+                      j.max_salary,
+                      j.salary_currency,
+                      j.disclose_salary,
                       j.employment_type,
                       j.work_mode,
                       j.status,
+                      j.educational_qualification,
+                      j.min_education_level,
                       j.content_hash,
                       j.updated_at,
                       COALESCE(j.location, COALESCE(j.city, '') || CASE WHEN j.state IS NOT NULL AND j.state != '' THEN ', ' || j.state ELSE '' END) AS location
@@ -323,6 +363,17 @@ class RecommendationService:
             for h in vec_hits
         }
 
+        # Check existing applications for this candidate to show applied status & prevent duplicates
+        applied_map: Dict[str, str] = {}
+        try:
+            applied_rows = db.execute(
+                text("SELECT job_id, status FROM public.applications WHERE candidate_id = :cid"),
+                {"cid": str(request.candidate_id)},
+            ).mappings().all()
+            applied_map = {str(r["job_id"]): str(r["status"]) for r in applied_rows}
+        except Exception as exc:
+            logger.warning(f"Failed querying existing applications for candidate: {exc}")
+
         recommendations_raw: List[Dict[str, Any]] = []
         cand_exp = float(cand["total_experience_years"] or 0.0)
         tolerance = float(request.experience_tolerance_years or 2.0)
@@ -352,20 +403,75 @@ class RecommendationService:
             )
             sim_score = sim_map.get(job_id_str, round((skill_res["score"] * 0.7) + 15.0, 2))
 
-            overall = round(
-                (skill_res["score"] * 0.45)
-                + (sim_score * 0.35)
-                + (exp_score * 0.20),
-                2,
+            loc_score = scoring_service.compute_location_preference_score(
+                candidate_location=cand.get("current_location"),
+                preferred_locations=cand.get("preferred_locations") or [],
+                job_location=job.get("location"),
+                job_work_mode=job.get("work_mode"),
+            )
+            edu_score = scoring_service.compute_education_score(
+                education_entries=cand.get("education") or [],
+                min_education_level=job.get("min_education_level"),
+                educational_qualification=job.get("educational_qualification"),
+            )
+            emp_type_score = scoring_service.compute_employment_type_score(
+                candidate_preferred_type=cand.get("preferred_employment_type"),
+                job_employment_type=job.get("employment_type"),
+            )
+
+            # Specification Candidate Weights:
+            # Skills Match: 40%, Experience Match: 25%, Job Description Relevance: 15%,
+            # Location Preference: 10%, Education Match: 5%, Employment Type: 5%
+            overall = scoring_service.compute_candidate_job_score(
+                skill_score=skill_res["score"],
+                experience_score=exp_score,
+                jd_relevance_score=sim_score,
+                location_score=loc_score,
+                education_score=edu_score,
+                employment_type_score=emp_type_score,
             )
 
             matched_skills = skill_res["matched_skills"]
             missing_skills = skill_res["missing_skills"]
-            explanation = (
-                f"Matches {len(matched_skills)} key skill(s) for {job['job_title']}"
-                + (f" ({', '.join(matched_skills[:5])})" if matched_skills else "")
-                + f" with {sim_score:.0f}% semantic alignment and {exp_score:.0f}% experience fit."
-            )
+
+            if matched_skills:
+                explanation = (
+                    f"Your experience with {', '.join(matched_skills[:4])} aligns closely with this position "
+                    f"({overall:.0f}% match at {job.get('company_name')})."
+                )
+            else:
+                explanation = (
+                    f"Your professional background aligns with this {job['job_title']} position "
+                    f"({overall:.0f}% match based on semantic and experience analysis)."
+                )
+
+            # Format salary display
+            salary_str = None
+            if job.get("disclose_salary", True) and (job.get("min_salary") or job.get("max_salary")):
+                curr = job.get("salary_currency") or "INR"
+                min_s = float(job["min_salary"]) if job.get("min_salary") is not None else None
+                max_s = float(job["max_salary"]) if job.get("max_salary") is not None else None
+                if min_s and max_s:
+                    salary_str = f"{curr} {min_s:,.0f} - {max_s:,.0f}"
+                elif min_s:
+                    salary_str = f"{curr} {min_s:,.0f}+"
+                elif max_s:
+                    salary_str = f"Up to {curr} {max_s:,.0f}"
+
+            # Format experience required
+            exp_req = job.get("experience_required")
+            if not exp_req:
+                min_e = float(job["min_experience"]) if job.get("min_experience") is not None else None
+                max_e = float(job["max_experience"]) if job.get("max_experience") is not None else None
+                if min_e is not None and max_e is not None:
+                    exp_req = f"{min_e:.0f} - {max_e:.0f} years"
+                elif min_e is not None and min_e > 0:
+                    exp_req = f"{min_e:.0f}+ years"
+                else:
+                    exp_req = "Not specified"
+
+            has_applied = job_id_str in applied_map
+            app_status = applied_map.get(job_id_str)
 
             recommendations_raw.append(
                 {
@@ -373,17 +479,33 @@ class RecommendationService:
                     "job_id": UUID(job_id_str),
                     "company_id": UUID(str(job["company_id"])),
                     "company_name": job.get("company_name"),
+                    "company_logo": job.get("company_logo"),
                     "job_title": job["job_title"],
                     "employment_type": job.get("employment_type"),
                     "work_mode": job.get("work_mode"),
                     "location": job.get("location") or None,
+                    "salary_range": salary_str,
+                    "min_salary": float(job["min_salary"]) if job.get("min_salary") is not None else None,
+                    "max_salary": float(job["max_salary"]) if job.get("max_salary") is not None else None,
+                    "salary_currency": job.get("salary_currency") or "INR",
+                    "experience_required": exp_req,
+                    "min_experience": float(job["min_experience"]) if job.get("min_experience") is not None else None,
+                    "max_experience": float(job["max_experience"]) if job.get("max_experience") is not None else None,
+                    "required_skills": job.get("required_skills") or [],
                     "overall_score": overall,
+                    "match_percentage": int(round(overall)),
                     "semantic_similarity_score": sim_score,
                     "skill_match_score": skill_res["score"],
                     "experience_fit_score": exp_score,
+                    "location_score": loc_score,
+                    "education_score": edu_score,
+                    "employment_type_score": emp_type_score,
                     "matched_skills": matched_skills,
                     "missing_skills": missing_skills,
                     "explanation": explanation,
+                    "ai_explanation": explanation,
+                    "has_applied": has_applied,
+                    "application_status": app_status,
                 }
             )
 

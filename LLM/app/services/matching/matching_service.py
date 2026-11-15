@@ -63,6 +63,7 @@ class MatchingService:
                       required_skills, preferred_skills, responsibilities,
                       min_experience, max_experience,
                       min_salary, max_salary,
+                      educational_qualification, min_education_level, required_certifications,
                       employment_type, work_mode, status, content_hash,
                       city, state, country,
                       COALESCE(location, COALESCE(city, '') || CASE WHEN state IS NOT NULL AND state != '' THEN ', ' || state ELSE '' END) AS location
@@ -131,6 +132,7 @@ class MatchingService:
                       a.status AS application_status,
                       u.full_name AS candidate_name,
                       u.email AS candidate_email,
+                      u.avatar_url AS profile_image,
                       cr.version AS resume_version,
                       cr.resume_status,
                       cp_pub.headline AS public_headline,
@@ -138,7 +140,9 @@ class MatchingService:
                       cp_pub.skills AS public_skills,
                       cp_pub.years_of_experience AS public_experience_years,
                       cp_pub.location AS public_location,
-                      cp_pub.expected_salary AS expected_salary
+                      cp_pub.expected_salary AS expected_salary,
+                      cp_pub.career_summary AS public_career_summary,
+                      cp_pub.profile_image_url AS candidate_profile_image
                     FROM public.applications a
                     JOIN public.users u ON u.id = a.candidate_id
                     LEFT JOIN public.candidate_resumes cr ON cr.id = a.resume_id
@@ -212,6 +216,7 @@ class MatchingService:
             experience_entries = ai_profile.work_experience or []
             projects = ai_profile.projects or []
             education_entries = ai_profile.education or []
+            certifications = ai_profile.certifications or []
 
             # Ensure embeddings exist
             embedding_service.ensure_candidate_embeddings(
@@ -233,12 +238,66 @@ class MatchingService:
             experience_entries = []
             projects = []
             education_entries = []
+            certifications = []
+
+        if not education_entries:
+            try:
+                edu_rows = db.execute(
+                    text(
+                        "SELECT degree, field_of_study, institution_name, education_level "
+                        "FROM public.candidate_education WHERE candidate_id = :cid"
+                    ),
+                    {"cid": str(candidate_id)},
+                ).mappings().all()
+                education_entries = [dict(r) for r in edu_rows]
+            except Exception:
+                pass
+
+        if not certifications:
+            try:
+                cert_rows = db.execute(
+                    text(
+                        "SELECT certification_name, issuing_organization "
+                        "FROM public.candidate_certifications WHERE candidate_id = :cid"
+                    ),
+                    {"cid": str(candidate_id)},
+                ).mappings().all()
+                certifications = [dict(r) for r in cert_rows]
+            except Exception:
+                pass
+
+        edu_summary = "Not specified"
+        if education_entries:
+            first_edu = education_entries[0]
+            deg = first_edu.get("degree") or first_edu.get("education_level") or ""
+            field = first_edu.get("field_of_study") or ""
+            inst = first_edu.get("institution_name") or first_edu.get("university") or ""
+            edu_summary = f"{deg} in {field}".strip() if field else str(deg)
+            if inst:
+                edu_summary += f", {inst}" if edu_summary else str(inst)
+
+        rel_exp_summary = ""
+        if experience_entries:
+            first_exp = experience_entries[0]
+            role = first_exp.get("job_title") or first_exp.get("role") or ""
+            comp = first_exp.get("company_name") or first_exp.get("company") or ""
+            desc = first_exp.get("description") or ""
+            rel_exp_summary = f"{role} at {comp}" if comp else role
+            if desc:
+                rel_exp_summary += f" - {str(desc)[:100]}..."
+        if not rel_exp_summary:
+            rel_exp_summary = str(app_row.get("public_career_summary") or summary or f"{exp_years:.1f} years professional experience")[:160]
+
+        profile_img = app_row.get("candidate_profile_image") or app_row.get("profile_image")
+        designation = app_row.get("public_headline") or (experience_entries[0].get("job_title") if experience_entries else "Candidate")
 
         return {
             "application_id": UUID(str(app_row["application_id"])),
             "candidate_id": candidate_id,
             "candidate_name": app_row.get("candidate_name"),
             "candidate_email": app_row.get("candidate_email"),
+            "profile_image": profile_img,
+            "designation": designation,
             "application_status": app_row.get("application_status"),
             "resume_id": resume_id,
             "resume_version": resume_version,
@@ -253,6 +312,9 @@ class MatchingService:
             "projects": projects,
             "education": education_entries,
             "education_entries": education_entries,
+            "education_summary": edu_summary,
+            "certifications": certifications,
+            "relevant_experience_summary": rel_exp_summary,
         }
 
     def _build_deterministic_evaluation_fallback(
@@ -474,17 +536,36 @@ class MatchingService:
                 )
                 sim_score = similarity_map.get(cand_id_str, round((skill_res["score"] * 0.7) + 15.0, 2))
 
+                edu_score = scoring_service.compute_education_score(
+                    education_entries=cand.get("education_entries") or [],
+                    min_education_level=job_data.get("min_education_level"),
+                    educational_qualification=job_data.get("educational_qualification"),
+                )
+                cert_score = scoring_service.compute_certifications_score(
+                    certifications=cand.get("certifications") or [],
+                    required_certifications=job_data.get("required_certifications") or [],
+                    target_skills=job_data.get("required_skills") or [],
+                )
+                jd_score = scoring_service.compute_jd_alignment_score(
+                    similarity_score=sim_score,
+                )
+
                 prelim_score = (
-                    (skill_res["score"] * 0.45)
-                    + (sim_score * 0.30)
-                    + (exp_score * 0.15)
-                    + (proj_score * 0.10)
+                    (skill_res["score"] * 0.40)
+                    + (exp_score * 0.25)
+                    + (proj_score * 0.15)
+                    + (edu_score * 0.10)
+                    + (cert_score * 0.05)
+                    + (jd_score * 0.05)
                 )
                 cand["skill_score"] = skill_res["score"]
                 cand["matched_skills"] = skill_res["matched_skills"]
                 cand["missing_skills"] = skill_res["missing_skills"]
                 cand["experience_score"] = exp_score
                 cand["project_score"] = proj_score
+                cand["education_score"] = edu_score
+                cand["certifications_score"] = cert_score
+                cand["jd_score"] = jd_score
                 cand["similarity_score"] = sim_score
                 cand["prelim_score"] = round(prelim_score, 2)
                 preliminary_list.append(cand)
@@ -606,6 +687,9 @@ class MatchingService:
                     similarity_score=cand["similarity_score"],
                     project_score=cand["project_score"],
                     llm_score=llm_score,
+                    education_score=cand.get("education_score", 80.0),
+                    certifications_score=cand.get("certifications_score", 75.0),
+                    jd_alignment_score=cand.get("jd_score", cand["similarity_score"]),
                     weights=request.weights,
                 )
                 category = scoring_service.categorize_score(final_score)
@@ -691,13 +775,24 @@ class MatchingService:
                         "candidate_id": cand["candidate_id"],
                         "candidate_name": cand.get("candidate_name"),
                         "candidate_email": cand.get("candidate_email"),
+                        "profile_image": cand.get("profile_image"),
+                        "designation": cand.get("designation") or "Candidate",
+                        "experience_years": cand.get("total_experience_years"),
+                        "location": cand.get("location"),
+                        "education": cand.get("education_summary"),
+                        "education_entries": cand.get("education_entries") or [],
+                        "certifications": cand.get("certifications") or [],
                         "resume_id": cand.get("resume_id"),
                         "resume_version": resume_version,
                         "application_status": cand.get("application_status"),
                         "overall_score": final_score,
+                        "match_percentage": int(round(final_score)),
                         "skill_score": cand["skill_score"],
                         "experience_score": cand["experience_score"],
                         "project_score": cand["project_score"],
+                        "education_score": cand.get("education_score", 80.0),
+                        "certifications_score": cand.get("certifications_score", 75.0),
+                        "jd_alignment_score": cand.get("jd_score", cand["similarity_score"]),
                         "similarity_score": cand["similarity_score"],
                         "llm_score": llm_score,
                         "recommendation_category": category,
@@ -707,6 +802,8 @@ class MatchingService:
                         "weaknesses": eval_record.weaknesses,
                         "evidence": eval_record.evidence,
                         "explanation": eval_record.summary_explanation,
+                        "ai_explanation": eval_record.summary_explanation,
+                        "relevant_experience_summary": cand.get("relevant_experience_summary") or "",
                         "cached_evaluation": used_cache,
                         "_match_record": match_record,
                     }

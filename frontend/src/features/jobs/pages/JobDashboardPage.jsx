@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   List,
+  Sparkles,
 } from "lucide-react";
 
 import { jobsApi } from "../api/jobsApi";
@@ -22,6 +23,7 @@ import { JobSearch } from "../components/JobSearch";
 import { JobFilters } from "../components/JobFilters";
 import { JobTable } from "../components/JobTable";
 import { ConfirmDialog } from "../../companies/components/ConfirmDialog";
+import { FindTopCandidatesModal } from "../../recruiter/components/FindTopCandidatesModal";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { ErrorState } from "../../../components/feedback/ErrorState";
 import { Button } from "../../../components/ui/Button";
@@ -41,6 +43,7 @@ export function JobDashboardPage() {
   });
   const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState({ action: null, job: null });
+  const [topCandidatesModalOpen, setTopCandidatesModalOpen] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search, 300);
   const debouncedLocation = useDebouncedValue(filters.location, 300);
@@ -228,6 +231,14 @@ export function JobDashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            type="button"
+            onClick={() => setTopCandidatesModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-soft hover:bg-indigo-700"
+          >
+            <Sparkles size={16} />
+            Find Top Candidates
+          </Button>
           <Link
             to="/app/jobs/my"
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -374,6 +385,12 @@ export function JobDashboardPage() {
           dialog.job &&
           actionMutation.mutate({ action: dialog.action, job: dialog.job })
         }
+      />
+
+      {/* ── AI Top Candidates Modal ── */}
+      <FindTopCandidatesModal
+        open={topCandidatesModalOpen}
+        onClose={() => setTopCandidatesModalOpen(false)}
       />
     </div>
   );

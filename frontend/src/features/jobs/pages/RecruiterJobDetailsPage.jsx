@@ -31,6 +31,7 @@ import {
 } from "../components/JobStatusBadge";
 import { CompanyStatusBadge } from "../../companies/components/CompanyStatusBadge";
 import { ConfirmDialog } from "../../companies/components/ConfirmDialog";
+import { FindTopCandidatesModal } from "../../recruiter/components/FindTopCandidatesModal";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { ErrorState } from "../../../components/feedback/ErrorState";
 import { Button } from "../../../components/ui/Button";
@@ -41,6 +42,7 @@ export function RecruiterJobDetailsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [confirmAction, setConfirmAction] = useState(null);
+  const [topCandidatesOpen, setTopCandidatesOpen] = useState(false);
 
   const query = useQuery({
     queryKey: ["jobs", "detail", id],
@@ -139,6 +141,15 @@ export function RecruiterJobDetailsPage() {
 
         {/* Action Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            onClick={() => setTopCandidatesOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-indigo-700"
+          >
+            <Sparkles size={15} />
+            Find Top Candidates
+          </Button>
+
           {job.status === "PUBLISHED" && (
             <Link
               to={`/app/jobs/${job.id}`}
@@ -629,6 +640,14 @@ export function RecruiterJobDetailsPage() {
         onConfirm={() =>
           confirmAction && lifecycleMutation.mutate(confirmAction)
         }
+      />
+
+      {/* AI Candidate Matching Modal */}
+      <FindTopCandidatesModal
+        open={topCandidatesOpen}
+        onClose={() => setTopCandidatesOpen(false)}
+        initialJobId={id}
+        initialJob={job}
       />
     </div>
   );

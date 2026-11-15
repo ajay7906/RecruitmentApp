@@ -33,17 +33,34 @@ class RecommendedJobItem(BaseModel):
     job_id: UUID
     company_id: UUID
     company_name: Optional[str] = None
+    company_logo: Optional[str] = None
     job_title: str
+    title: Optional[str] = None
     employment_type: Optional[str] = None
     work_mode: Optional[str] = None
     location: Optional[str] = None
+    salary_range: Optional[str] = None
+    min_salary: Optional[float] = None
+    max_salary: Optional[float] = None
+    salary_currency: Optional[str] = "INR"
+    experience_required: Optional[str] = None
+    min_experience: Optional[float] = None
+    max_experience: Optional[float] = None
+    required_skills: List[str] = Field(default_factory=list)
     overall_score: float
-    semantic_similarity_score: float
-    skill_match_score: float
-    experience_fit_score: float
+    match_percentage: float = 0.0
+    semantic_similarity_score: float = 0.0
+    skill_match_score: float = 0.0
+    experience_fit_score: float = 0.0
+    location_score: float = 0.0
+    education_score: float = 0.0
+    employment_type_score: float = 0.0
     matched_skills: List[str] = Field(default_factory=list)
     missing_skills: List[str] = Field(default_factory=list)
-    explanation: str
+    explanation: str = ""
+    ai_explanation: Optional[str] = None
+    has_applied: bool = False
+    application_status: Optional[str] = None
 
 
 class RecommendationResponse(BaseModel):

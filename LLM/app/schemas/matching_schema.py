@@ -5,11 +5,22 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class ScoringWeightsConfig(BaseModel):
-    skill_weight: float = Field(default=0.35, ge=0.0, le=1.0)
-    experience_weight: float = Field(default=0.20, ge=0.0, le=1.0)
-    semantic_weight: float = Field(default=0.20, ge=0.0, le=1.0)
-    llm_weight: float = Field(default=0.15, ge=0.0, le=1.0)
-    project_weight: float = Field(default=0.10, ge=0.0, le=1.0)
+    # Specification Recruiter Weights:
+    # Skills Match: 40%, Relevant Experience: 25%, Project Relevance: 15%,
+    # Education Match: 10%, Certifications: 5%, Job Description Alignment: 5%
+    skills_match_weight: float = Field(default=0.40, ge=0.0, le=1.0)
+    relevant_experience_weight: float = Field(default=0.25, ge=0.0, le=1.0)
+    project_relevance_weight: float = Field(default=0.15, ge=0.0, le=1.0)
+    education_match_weight: float = Field(default=0.10, ge=0.0, le=1.0)
+    certifications_weight: float = Field(default=0.05, ge=0.0, le=1.0)
+    jd_alignment_weight: float = Field(default=0.05, ge=0.0, le=1.0)
+
+    # Backward compatibility aliases
+    skill_weight: Optional[float] = None
+    experience_weight: Optional[float] = None
+    semantic_weight: Optional[float] = None
+    llm_weight: Optional[float] = None
+    project_weight: Optional[float] = None
 
 
 class MatchingFilterConfig(BaseModel):
@@ -66,14 +77,25 @@ class RankedCandidateItem(BaseModel):
     candidate_id: UUID
     candidate_name: Optional[str] = None
     candidate_email: Optional[str] = None
+    profile_image: Optional[str] = None
+    designation: Optional[str] = None
+    experience_years: Optional[float] = None
+    location: Optional[str] = None
+    education: Optional[str] = None
+    education_entries: List[Dict[str, Any]] = Field(default_factory=list)
+    certifications: List[Dict[str, Any]] = Field(default_factory=list)
     resume_id: Optional[UUID] = None
     resume_version: int = 1
     application_status: Optional[str] = None
     overall_score: float
-    skill_score: float
-    experience_score: float
-    project_score: float
-    similarity_score: float
+    match_percentage: float = 0.0
+    skill_score: float = 0.0
+    experience_score: float = 0.0
+    project_score: float = 0.0
+    education_score: float = 0.0
+    certifications_score: float = 0.0
+    jd_alignment_score: float = 0.0
+    similarity_score: float = 0.0
     llm_score: Optional[float] = None
     recommendation_category: str = "CONSIDER"
     matched_skills: List[str] = Field(default_factory=list)
@@ -82,6 +104,8 @@ class RankedCandidateItem(BaseModel):
     weaknesses: List[str] = Field(default_factory=list)
     evidence: List[EvidenceItemSchema] = Field(default_factory=list)
     explanation: str = ""
+    ai_explanation: Optional[str] = None
+    relevant_experience_summary: str = ""
     cached_evaluation: bool = False
 
 

@@ -18,6 +18,11 @@ def recommend_jobs_endpoint(
     db: Session = Depends(get_db),
     auth: InternalAuthContext = Depends(verify_internal_request),
 ) -> RecommendationResponse:
+    if auth.actor_role == "candidate" and auth.actor_id and auth.actor_id != payload.candidate_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "FORBIDDEN", "message": "Candidates can only view their own job recommendations"},
+        )
     if auth.company_id and payload.company_id and auth.company_id != payload.company_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

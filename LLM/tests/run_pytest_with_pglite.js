@@ -12,9 +12,19 @@ const { startTestDatabase } = require('../../backend/tests/helpers/testDb');
     '?sslmode=disable&gssencmode=disable';
   console.log('[PGlite Runner] Database ready at', psycopgUrl);
 
+  const pythonBin =
+    process.platform === 'win32'
+      ? path.resolve(__dirname, '../venv/Scripts/python.exe')
+      : path.resolve(__dirname, '../venv/bin/python');
+
+  const extraArgs =
+    process.argv.slice(2).length > 0
+      ? process.argv.slice(2)
+      : ['LLM/tests/test_ai_engine.py', '-v'];
+
   const py = spawn(
-    'python',
-    ['-m', 'pytest', 'LLM/tests/test_ai_engine.py', '-v', '-s'],
+    pythonBin,
+    ['-m', 'pytest', ...extraArgs],
     {
       cwd: path.resolve(__dirname, '../..'),
       stdio: 'inherit',

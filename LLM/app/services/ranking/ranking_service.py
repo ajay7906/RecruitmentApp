@@ -146,12 +146,30 @@ class RankingService:
                 )
             )
 
+            edu_score = scoring_service.compute_education_score(
+                education_entries=cand.get("education_entries") or [],
+                min_education_level=job_data.get("min_education_level"),
+                educational_qualification=job_data.get("educational_qualification"),
+            )
+            cert_score = scoring_service.compute_certifications_score(
+                certifications=cand.get("certifications") or [],
+                required_certifications=job_data.get("required_certifications") or [],
+                target_skills=job_data.get("required_skills") or [],
+            )
+            jd_score = scoring_service.compute_jd_alignment_score(
+                similarity_score=sim_score,
+                llm_score=llm_score,
+            )
+
             final_score = scoring_service.compute_final_weighted_score(
                 skill_score=skill_score,
                 experience_score=exp_score,
                 similarity_score=sim_score,
                 project_score=proj_score,
                 llm_score=llm_score,
+                education_score=edu_score,
+                certifications_score=cert_score,
+                jd_alignment_score=jd_score,
                 weights=request.weights,
             )
             category = scoring_service.categorize_score(final_score)
@@ -193,13 +211,24 @@ class RankingService:
                     "candidate_id": cand["candidate_id"],
                     "candidate_name": cand.get("candidate_name"),
                     "candidate_email": cand.get("candidate_email"),
+                    "profile_image": cand.get("profile_image"),
+                    "designation": cand.get("designation") or "Candidate",
+                    "experience_years": cand.get("total_experience_years"),
+                    "location": cand.get("location"),
+                    "education": cand.get("education_summary"),
+                    "education_entries": cand.get("education_entries") or [],
+                    "certifications": cand.get("certifications") or [],
                     "resume_id": cand.get("resume_id"),
                     "resume_version": resume_version,
                     "application_status": cand.get("application_status"),
                     "overall_score": final_score,
+                    "match_percentage": int(round(final_score)),
                     "skill_score": skill_score,
                     "experience_score": exp_score,
                     "project_score": proj_score,
+                    "education_score": edu_score,
+                    "certifications_score": cert_score,
+                    "jd_alignment_score": jd_score,
                     "similarity_score": sim_score,
                     "llm_score": llm_score,
                     "recommendation_category": category,
@@ -209,6 +238,8 @@ class RankingService:
                     "weaknesses": weaknesses,
                     "evidence": evidence,
                     "explanation": explanation,
+                    "ai_explanation": explanation,
+                    "relevant_experience_summary": cand.get("relevant_experience_summary") or "",
                     "cached_evaluation": has_cached_eval,
                 }
             )

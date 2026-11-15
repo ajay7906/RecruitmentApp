@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../../../stores/authStore";
 import { profileApi } from "../../candidate-profile/api/profileApi";
 import { ProfileCompletion } from "../../candidate-profile/components/ProfileCompletion";
+import { AIJobRecommendationsSection } from "../components/AIJobRecommendationsSection";
 
 function getDashboardCards(role) {
   if (role === "recruiter") {
@@ -248,6 +249,11 @@ export function DashboardPage() {
           </div>
         </div>
       ) : null}
+
+      {/* Candidate AI Job Recommendations Section */}
+      {isCandidate && (
+        <AIJobRecommendationsSection candidateProfile={profile} />
+      )}
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {cards.map(({ label, value, icon: Icon, to, note }) => (
