@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { notificationsApi } from "../api/notificationsApi";
 import { DateRangeFilter } from "../../admin/components/DateRangeFilter";
+import { Pagination } from "../../../components/ui/Pagination";
 
 export function ReportsCenterPage({ embedded = false, defaultCompanyId = "" }) {
   const params = useParams();
@@ -26,6 +27,7 @@ export function ReportsCenterPage({ embedded = false, defaultCompanyId = "" }) {
   const [workMode, setWorkMode] = useState("");
   const [decisionFilter, setDecisionFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
 
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -67,7 +69,7 @@ export function ReportsCenterPage({ embedded = false, defaultCompanyId = "" }) {
       };
       if (includePagination) {
         p.page = page;
-        p.limit = 20;
+        p.limit = limit;
       }
       return p;
     },
@@ -81,6 +83,7 @@ export function ReportsCenterPage({ embedded = false, defaultCompanyId = "" }) {
       workMode,
       decisionFilter,
       page,
+      limit,
     ]
   );
 
@@ -382,33 +385,19 @@ export function ReportsCenterPage({ embedded = false, defaultCompanyId = "" }) {
           </table>
         </div>
 
-        {pagination && pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-xs text-slate-600">
-            <span>
-              Page <strong>{pagination.page}</strong> of{" "}
-              <strong>{pagination.totalPages}</strong> ({pagination.total} total records)
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={pagination.page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold hover:bg-slate-50 disabled:opacity-40"
-              >
-                <ChevronLeft size={14} /> Prev
-              </button>
-              <button
-                type="button"
-                disabled={pagination.page >= pagination.totalPages}
-                onClick={() =>
-                  setPage((p) => Math.min(pagination.totalPages, p + 1))
-                }
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold hover:bg-slate-50 disabled:opacity-40"
-              >
-                Next <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
+        {pagination && (
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalRecords={pagination.total}
+            pageSize={pagination.limit || limit}
+            onPageChange={setPage}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+            loading={loading}
+          />
         )}
       </div>
     </div>

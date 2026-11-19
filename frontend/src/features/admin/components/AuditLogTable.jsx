@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AdminDataTable } from "./AdminDataTable";
 import { Eye, X } from "lucide-react";
 
-export function AuditLogTable({ logs = [], loading = false, pagination, onPageChange }) {
+export function AuditLogTable({ logs = [], loading = false, pagination, onPageChange, onLimitChange }) {
   const [selectedLog, setSelectedLog] = useState(null);
 
   const columns = [
@@ -95,6 +95,7 @@ export function AuditLogTable({ logs = [], loading = false, pagination, onPageCh
         loading={loading}
         pagination={pagination}
         onPageChange={onPageChange}
+        onLimitChange={onLimitChange}
         emptyTitle="No audit log entries match the selected filters"
       />
 

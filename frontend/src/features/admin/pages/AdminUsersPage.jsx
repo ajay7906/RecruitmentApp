@@ -19,6 +19,7 @@ export function AdminUsersPage() {
     sortOrder: "desc",
   });
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [data, setData] = useState({ users: [], pagination: null });
   const [loading, setLoading] = useState(true);
   const [statusDialog, setStatusDialog] = useState({ open: false, user: null, targetStatus: null });
@@ -34,7 +35,7 @@ export function AdminUsersPage() {
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder,
         page,
-        limit: 20,
+        limit,
       });
       setData(res);
     } catch (error) {
@@ -42,7 +43,7 @@ export function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [q, filters, page]);
+  }, [q, filters, page, limit]);
 
   useEffect(() => {
     fetchUsers();
@@ -241,6 +242,10 @@ export function AdminUsersPage() {
         loading={loading}
         pagination={data.pagination}
         onPageChange={setPage}
+        onLimitChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
       />
 
       <SuspensionDialog

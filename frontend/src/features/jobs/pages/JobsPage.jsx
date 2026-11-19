@@ -20,6 +20,7 @@ import { JobCard } from "../components/JobCard";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { ErrorState } from "../../../components/feedback/ErrorState";
 import { Button } from "../../../components/ui/Button";
+import { Pagination } from "../../../components/ui/Pagination";
 import { useAuthStore } from "../../../stores/authStore";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 
@@ -48,6 +49,7 @@ export function JobsPage() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState(initialFilters);
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
   const debouncedSearch = useDebouncedValue(search, 300);
   const debouncedSkill = useDebouncedValue(filters.skill, 300);
@@ -71,6 +73,7 @@ export function JobsPage() {
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder,
         page,
+        limit,
       },
     ],
     queryFn: () =>
@@ -90,7 +93,7 @@ export function JobsPage() {
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder,
         page,
-        limit: 10,
+        limit,
       }),
     retry: false,
   });
@@ -301,33 +304,20 @@ export function JobsPage() {
       )}
 
       {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-between text-sm text-slate-600">
-          <p>
-            Page <span className="font-semibold">{pagination.page}</span> of{" "}
-            <span className="font-semibold">{pagination.totalPages}</span> (
-            {pagination.total} jobs)
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="gap-1 px-3 py-2 text-xs"
-            >
-              <ChevronLeft size={14} /> Previous
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={page >= pagination.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="gap-1 px-3 py-2 text-xs"
-            >
-              Next <ChevronRight size={14} />
-            </Button>
-          </div>
+      {pagination && (
+        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalRecords={pagination.total}
+            pageSize={pagination.limit || limit}
+            onPageChange={setPage}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+            loading={query.isFetching}
+          />
         </div>
       )}
     </div>

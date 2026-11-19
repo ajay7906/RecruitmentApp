@@ -9,19 +9,23 @@ import { ErrorState } from '../../../components/feedback/ErrorState'
 import { InterviewCard } from '../components/InterviewCard'
 import { InterviewCalendar } from '../components/InterviewCalendar'
 import { RescheduleDialog } from '../components/RescheduleDialog'
+import { Pagination } from '../../../components/ui/Pagination'
 
 export function MyInterviewsPage() {
   const queryClient = useQueryClient()
   const [timeframe, setTimeframe] = useState('ALL')
   const [viewMode, setViewMode] = useState('list')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
   const [rescheduleTarget, setRescheduleTarget] = useState(null)
 
   const query = useQuery({
-    queryKey: ['candidate', 'interviews', timeframe],
+    queryKey: ['candidate', 'interviews', timeframe, page, limit],
     queryFn: () =>
       interviewsApi.listCandidateInterviews({
         timeframe: timeframe === 'ALL' ? undefined : timeframe,
-        limit: 50,
+        page,
+        limit,
       }),
   })
 
@@ -89,7 +93,10 @@ export function MyInterviewsPage() {
             <button
               key={tf}
               type="button"
-              onClick={() => setTimeframe(tf)}
+              onClick={() => {
+                setTimeframe(tf);
+                setPage(1);
+              }}
               className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
                 timeframe === tf
                   ? 'bg-indigo-600 text-white'
@@ -158,6 +165,23 @@ export function MyInterviewsPage() {
               }
             />
           ))}
+
+          {query.data?.pagination && (
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+              <Pagination
+                currentPage={query.data.pagination.page}
+                totalPages={query.data.pagination.totalPages}
+                totalRecords={query.data.pagination.total}
+                pageSize={query.data.pagination.limit || limit}
+                onPageChange={setPage}
+                onLimitChange={(newLimit) => {
+                  setLimit(newLimit);
+                  setPage(1);
+                }}
+                loading={query.isFetching}
+              />
+            </div>
+          )}
         </div>
       )}
 

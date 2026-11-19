@@ -19,6 +19,7 @@ import { ApplicationTable } from "../components/ApplicationTable";
 import { StatusUpdateDialog } from "../components/StatusUpdateDialog";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { ErrorState } from "../../../components/feedback/ErrorState";
+import { Pagination } from "../../../components/ui/Pagination";
 
 export function RecruiterApplicationsDashboardPage() {
   const queryClient = useQueryClient();
@@ -217,33 +218,17 @@ export function RecruiterApplicationsDashboardPage() {
       )}
 
       {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-xs text-slate-600">
-          <span>
-            Showing page <strong>{pagination.page}</strong> of{" "}
-            <strong>{pagination.totalPages}</strong> ({pagination.total} total
-            applications)
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={pagination.page <= 1}
-              onClick={() => updateFilters({ page: pagination.page - 1 })}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            >
-              <ChevronLeft size={14} />
-              Prev
-            </button>
-            <button
-              type="button"
-              disabled={pagination.page >= pagination.totalPages}
-              onClick={() => updateFilters({ page: pagination.page + 1 })}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            >
-              Next
-              <ChevronRight size={14} />
-            </button>
-          </div>
+      {pagination && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalRecords={pagination.total}
+            pageSize={pagination.limit || filters.limit}
+            onPageChange={(page) => updateFilters({ page })}
+            onLimitChange={(limit) => updateFilters({ limit, page: 1 })}
+            loading={applicationsQuery.isFetching}
+          />
         </div>
       )}
 

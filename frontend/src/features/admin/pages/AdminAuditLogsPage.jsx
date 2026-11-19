@@ -13,6 +13,7 @@ export function AdminAuditLogsPage() {
   const [action, setAction] = useState("");
   const [dateFilter, setDateFilter] = useState({ range: "30d", from: "", to: "" });
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
   const [data, setData] = useState({ logs: [], pagination: null });
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +26,7 @@ export function AdminAuditLogsPage() {
         action: action || undefined,
         ...dateFilter,
         page,
-        limit: 25,
+        limit,
       });
       setData(res);
     } catch (error) {
@@ -33,7 +34,7 @@ export function AdminAuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [q, entityType, action, dateFilter, page]);
+  }, [q, entityType, action, dateFilter, page, limit]);
 
   useEffect(() => {
     loadLogs();
@@ -122,6 +123,10 @@ export function AdminAuditLogsPage() {
         loading={loading}
         pagination={data.pagination}
         onPageChange={setPage}
+        onLimitChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
       />
     </div>
   );

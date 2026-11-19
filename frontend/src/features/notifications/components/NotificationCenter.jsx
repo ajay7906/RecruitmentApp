@@ -25,6 +25,7 @@ export function NotificationCenter() {
   const [channelFilter, setChannelFilter] = useState("ALL"); // "ALL" | "IN_APP" | "EMAIL"
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
   const [data, setData] = useState({
     notifications: [],
     unreadCount: 0,
@@ -40,7 +41,7 @@ export function NotificationCenter() {
           channel: channelFilter,
           category,
           page,
-          limit: 15,
+          limit,
         });
         setData({
           notifications: res?.items || [],
@@ -53,7 +54,7 @@ export function NotificationCenter() {
           isRead: readFilter === "ALL" ? undefined : readFilter,
           q: q.trim() || undefined,
           page,
-          limit: 15,
+          limit,
         });
         setData({
           notifications: res?.notifications || [],
@@ -66,7 +67,7 @@ export function NotificationCenter() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, category, readFilter, channelFilter, q, page]);
+  }, [activeTab, category, readFilter, channelFilter, q, page, limit]);
 
   useEffect(() => {
     loadData();
@@ -249,6 +250,10 @@ export function NotificationCenter() {
         loading={loading}
         pagination={data.pagination}
         onPageChange={setPage}
+        onLimitChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
         onMarkRead={activeTab === "inbox" ? handleMarkRead : undefined}
         onMarkUnread={activeTab === "inbox" ? handleMarkUnread : undefined}
         onDismiss={activeTab === "inbox" ? handleDismiss : undefined}

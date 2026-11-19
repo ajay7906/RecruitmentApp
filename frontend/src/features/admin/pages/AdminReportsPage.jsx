@@ -28,6 +28,7 @@ export function AdminReportsPage() {
   const [entityType, setEntityType] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [data, setData] = useState({ reports: [], counts: {}, pagination: null });
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +43,7 @@ export function AdminReportsPage() {
           entityType: entityType || undefined,
           status: statusFilter || undefined,
           page,
-          limit: 20,
+          limit,
         }),
         adminApi.listAdministrators().catch(() => ({ administrators: [] })),
       ]);
@@ -53,7 +54,7 @@ export function AdminReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [q, entityType, statusFilter, page]);
+  }, [q, entityType, statusFilter, page, limit]);
 
   useEffect(() => {
     loadReports();
@@ -290,6 +291,10 @@ export function AdminReportsPage() {
         loading={loading}
         pagination={data.pagination}
         onPageChange={setPage}
+        onLimitChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
       />
 
       {selectedReport && (

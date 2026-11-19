@@ -13,6 +13,7 @@ import { interviewsApi } from '../api/interviewsApi'
 import { LoadingState } from '../../../components/feedback/LoadingState'
 import { ErrorState } from '../../../components/feedback/ErrorState'
 import { Button } from '../../../components/ui/Button'
+import { Pagination } from '../../../components/ui/Pagination'
 import { InterviewStatistics } from '../components/InterviewStatistics'
 import { InterviewFilters } from '../components/InterviewFilters'
 import { InterviewTable } from '../components/InterviewTable'
@@ -203,36 +204,19 @@ export function InterviewDashboardPage() {
       )}
 
       {/* Pagination */}
-      {pagination.totalPages > 1 ? (
-        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
-          <span>
-            Showing page <strong>{pagination.page}</strong> of{' '}
-            <strong>{pagination.totalPages}</strong> ({pagination.total} total)
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={pagination.page <= 1}
-              onClick={() =>
-                setFilters((f) => ({ ...f, page: Math.max(1, f.page - 1) }))
-              }
-              className="py-1.5 text-xs"
-            >
-              Previous
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={pagination.page >= pagination.totalPages}
-              onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
-              className="py-1.5 text-xs"
-            >
-              Next
-            </Button>
-          </div>
+      {pagination && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalRecords={pagination.total}
+            pageSize={pagination.limit || filters.limit}
+            onPageChange={(page) => setFilters((f) => ({ ...f, page }))}
+            onLimitChange={(limit) => setFilters((f) => ({ ...f, limit, page: 1 }))}
+            loading={listQuery.isFetching}
+          />
         </div>
-      ) : null}
+      )}
 
       {/* Dialogs */}
       <RescheduleDialog

@@ -21,6 +21,7 @@ export function AdminJobsListPage({ approvalsOnly = false }) {
     workMode: "",
   });
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [data, setData] = useState({ jobs: [], counts: {}, pagination: null });
   const [loading, setLoading] = useState(true);
 
@@ -44,7 +45,7 @@ export function AdminJobsListPage({ approvalsOnly = false }) {
         employmentType: filters.employmentType || undefined,
         workMode: filters.workMode || undefined,
         page,
-        limit: 20,
+        limit,
       });
       setData(res);
     } catch (error) {
@@ -52,7 +53,7 @@ export function AdminJobsListPage({ approvalsOnly = false }) {
     } finally {
       setLoading(false);
     }
-  }, [q, statusFilter, pendingOnly, filters, page]);
+  }, [q, statusFilter, pendingOnly, filters, page, limit]);
 
   useEffect(() => {
     fetchJobs();
@@ -312,6 +313,10 @@ export function AdminJobsListPage({ approvalsOnly = false }) {
         loading={loading}
         pagination={data.pagination}
         onPageChange={setPage}
+        onLimitChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
       />
 
       <ApprovalDialog

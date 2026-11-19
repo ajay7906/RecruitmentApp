@@ -20,6 +20,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { ErrorState } from "../../../components/feedback/ErrorState";
 import { Button } from "../../../components/ui/Button";
+import { Pagination } from "../../../components/ui/Pagination";
 import { formatDate } from "../../../utils/formatters";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 
@@ -28,6 +29,7 @@ export function AdminCompaniesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const [dialog, setDialog] = useState({ type: null, company: null });
 
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -36,14 +38,14 @@ export function AdminCompaniesPage() {
     queryKey: [
       "companies",
       "admin-list",
-      { q: debouncedSearch, status: statusFilter, page },
+      { q: debouncedSearch, status: statusFilter, page, limit },
     ],
     queryFn: () =>
       companiesApi.listCompanies({
         q: debouncedSearch || undefined,
         status: statusFilter !== "ALL" ? statusFilter : undefined,
         page,
-        limit: 10,
+        limit,
       }),
   });
 
@@ -268,33 +270,20 @@ export function AdminCompaniesPage() {
         </div>
       )}
 
-      {pagination.totalPages > 1 && (
-        <div className="mt-5 flex items-center justify-between text-sm text-slate-600">
-          <p>
-            Page <span className="font-semibold">{pagination.page}</span> of{" "}
-            <span className="font-semibold">{pagination.totalPages}</span> (
-            {pagination.total} companies)
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="gap-1 px-3 py-2 text-xs"
-            >
-              <ChevronLeft size={14} /> Previous
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={page >= pagination.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="gap-1 px-3 py-2 text-xs"
-            >
-              Next <ChevronRight size={14} />
-            </Button>
-          </div>
+      {pagination && (
+        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalRecords={pagination.total}
+            pageSize={pagination.limit || limit}
+            onPageChange={setPage}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+            loading={query.isFetching}
+          />
         </div>
       )}
 

@@ -21,6 +21,7 @@ export function AdminApplicationsPage() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [data, setData] = useState({ applications: [], counts: {}, pagination: null });
   const [loading, setLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState(null);
@@ -33,7 +34,7 @@ export function AdminApplicationsPage() {
         q: q || undefined,
         status: statusFilter || undefined,
         page,
-        limit: 20,
+        limit,
       });
       setData(res);
     } catch (error) {
@@ -41,7 +42,7 @@ export function AdminApplicationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [q, statusFilter, page]);
+  }, [q, statusFilter, page, limit]);
 
   useEffect(() => {
     fetchApplications();
@@ -207,6 +208,10 @@ export function AdminApplicationsPage() {
         loading={loading}
         pagination={data.pagination}
         onPageChange={setPage}
+        onLimitChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
       />
 
       {/* Application Detail Drawer / Modal */}

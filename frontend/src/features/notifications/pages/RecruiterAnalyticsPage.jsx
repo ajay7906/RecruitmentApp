@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { notificationsApi } from "../api/notificationsApi";
 import { DateRangeFilter } from "../../admin/components/DateRangeFilter";
 import { AdminStatCard } from "../../admin/components/AdminStatCard";
+import { Pagination } from "../../../components/ui/Pagination";
 
 export function RecruiterAnalyticsPage() {
   const [dateFilter, setDateFilter] = useState({ range: "30d", from: "", to: "" });
@@ -19,6 +20,8 @@ export function RecruiterAnalyticsPage() {
   const [applicationStatus, setApplicationStatus] = useState("");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [perfPage, setPerfPage] = useState(1);
+  const [perfPageSize, setPerfPageSize] = useState(10);
 
   const loadAnalytics = useCallback(async () => {
     setLoading(true);
@@ -187,41 +190,58 @@ export function RecruiterAnalyticsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {jobPerf.map((j) => (
-                  <tr key={j.id} className="hover:bg-slate-50">
-                    <td className="py-3 font-bold text-slate-900">
-                      <Link
-                        to={`/app/jobs/${j.id}/manage`}
-                        className="hover:text-brand"
-                      >
-                        {j.title}
-                      </Link>
-                    </td>
-                    <td className="py-3 text-slate-600">{j.companyName}</td>
-                    <td className="py-3">
-                      <span className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-700">
-                        {j.status}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right font-bold text-slate-900">
-                      {j.applicationsCount}
-                    </td>
-                    <td className="py-3 text-right text-indigo-700 font-semibold">
-                      {j.shortlistedCount}
-                    </td>
-                    <td className="py-3 text-right text-amber-700 font-semibold">
-                      {j.interviewsCount}
-                    </td>
-                    <td className="py-3 text-right text-blue-700 font-semibold">
-                      {j.offeredCount}
-                    </td>
-                    <td className="py-3 text-right text-emerald-700 font-bold">
-                      {j.hiredCount}
-                    </td>
-                  </tr>
-                ))}
+                {jobPerf
+                  .slice((perfPage - 1) * perfPageSize, perfPage * perfPageSize)
+                  .map((j) => (
+                    <tr key={j.id} className="hover:bg-slate-50">
+                      <td className="py-3 font-bold text-slate-900">
+                        <Link
+                          to={`/app/jobs/${j.id}/manage`}
+                          className="hover:text-brand"
+                        >
+                          {j.title}
+                        </Link>
+                      </td>
+                      <td className="py-3 text-slate-600">{j.companyName}</td>
+                      <td className="py-3">
+                        <span className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-700">
+                          {j.status}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right font-bold text-slate-900">
+                        {j.applicationsCount}
+                      </td>
+                      <td className="py-3 text-right text-indigo-700 font-semibold">
+                        {j.shortlistedCount}
+                      </td>
+                      <td className="py-3 text-right text-amber-700 font-semibold">
+                        {j.interviewsCount}
+                      </td>
+                      <td className="py-3 text-right text-blue-700 font-semibold">
+                        {j.offeredCount}
+                      </td>
+                      <td className="py-3 text-right text-emerald-700 font-bold">
+                        {j.hiredCount}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
+            {jobPerf.length > 0 && (
+              <div className="mt-3 overflow-hidden rounded-xl border border-slate-100">
+                <Pagination
+                  currentPage={perfPage}
+                  totalPages={Math.ceil(jobPerf.length / perfPageSize) || 1}
+                  totalRecords={jobPerf.length}
+                  pageSize={perfPageSize}
+                  onPageChange={setPerfPage}
+                  onLimitChange={(newSize) => {
+                    setPerfPageSize(newSize);
+                    setPerfPage(1);
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

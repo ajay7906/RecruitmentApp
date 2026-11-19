@@ -30,6 +30,7 @@ export function AdminNotificationMonitoringPage() {
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [data, setData] = useState({
     deliveries: [],
     summary: { total: 0, SENT: 0, FAILED: 0, PENDING: 0, PROCESSING: 0 },
@@ -46,7 +47,7 @@ export function AdminNotificationMonitoringPage() {
         category: categoryFilter,
         q: q.trim() || undefined,
         page,
-        limit: 20,
+        limit,
       });
       setData(res);
     } catch (err) {
@@ -56,7 +57,7 @@ export function AdminNotificationMonitoringPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, categoryFilter, q, page]);
+  }, [statusFilter, categoryFilter, q, page, limit]);
 
   useEffect(() => {
     loadDeliveries();
@@ -263,6 +264,10 @@ export function AdminNotificationMonitoringPage() {
         loading={loading}
         pagination={data.pagination}
         onPageChange={setPage}
+        onLimitChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
         emptyMessage="No email delivery records match the current filters."
       />
     </div>

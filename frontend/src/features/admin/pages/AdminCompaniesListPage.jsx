@@ -19,6 +19,7 @@ export function AdminCompaniesListPage({ approvalsOnly = false }) {
   );
   const [industry, setIndustry] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [data, setData] = useState({ companies: [], counts: {}, pagination: null });
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +43,7 @@ export function AdminCompaniesListPage({ approvalsOnly = false }) {
         status: statusFilter || undefined,
         industry: industry || undefined,
         page,
-        limit: 20,
+        limit,
       });
       setData(res);
     } catch (error) {
@@ -50,7 +51,7 @@ export function AdminCompaniesListPage({ approvalsOnly = false }) {
     } finally {
       setLoading(false);
     }
-  }, [q, statusFilter, industry, page]);
+  }, [q, statusFilter, industry, page, limit]);
 
   useEffect(() => {
     fetchCompanies();
@@ -301,6 +302,10 @@ export function AdminCompaniesListPage({ approvalsOnly = false }) {
         loading={loading}
         pagination={data.pagination}
         onPageChange={setPage}
+        onLimitChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
       />
 
       <ApprovalDialog

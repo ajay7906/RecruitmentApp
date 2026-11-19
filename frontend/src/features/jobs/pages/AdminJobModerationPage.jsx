@@ -26,6 +26,7 @@ import { CompanyStatusBadge } from "../../companies/components/CompanyStatusBadg
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { ErrorState } from "../../../components/feedback/ErrorState";
 import { Button } from "../../../components/ui/Button";
+import { Pagination } from "../../../components/ui/Pagination";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 import { formatDate } from "../../../utils/formatters";
 
@@ -81,6 +82,7 @@ export function AdminJobModerationPage() {
   const [activeTab, setActiveTab] = useState("FLAGGED_ALL");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const [modal, setModal] = useState(null); // { job, action }
   const [reason, setReason] = useState("");
 
@@ -96,7 +98,7 @@ export function AdminJobModerationPage() {
     sortBy: activeTab === "FLAGGED_ALL" ? "moderationScore" : "createdAt",
     sortOrder: "desc",
     page,
-    limit: 10,
+    limit,
   };
 
   const jobsQuery = useQuery({
@@ -436,32 +438,20 @@ export function AdminJobModerationPage() {
       )}
 
       {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-slate-600">
-          <p>
-            Page <span className="font-semibold">{pagination.page}</span> of{" "}
-            <span className="font-semibold">{pagination.totalPages}</span>
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="gap-1 px-3 py-2 text-xs"
-            >
-              <ChevronLeft size={14} /> Previous
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={page >= pagination.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="gap-1 px-3 py-2 text-xs"
-            >
-              Next <ChevronRight size={14} />
-            </Button>
-          </div>
+      {pagination && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalRecords={pagination.total}
+            pageSize={pagination.limit || limit}
+            onPageChange={setPage}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+            loading={jobsQuery.isFetching}
+          />
         </div>
       )}
 

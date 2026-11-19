@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Pagination } from "../../../components/ui/Pagination";
 
 export function AdminDataTable({
   columns = [],
@@ -9,6 +9,7 @@ export function AdminDataTable({
   emptyDescription = "Try adjusting your search or filter criteria.",
   pagination,
   onPageChange,
+  onLimitChange,
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
@@ -76,32 +77,17 @@ export function AdminDataTable({
         </table>
       </div>
 
-      {pagination && pagination.totalPages > 1 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3">
-          <p className="text-xs text-slate-500">
-            Showing page <span className="font-semibold text-slate-800">{pagination.page}</span> of{" "}
-            <span className="font-semibold text-slate-800">{pagination.totalPages}</span> (
-            {pagination.total} total)
-          </p>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={pagination.page <= 1}
-              onClick={() => onPageChange?.(pagination.page - 1)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            >
-              <ChevronLeft size={14} /> Prev
-            </button>
-            <button
-              type="button"
-              disabled={pagination.page >= pagination.totalPages}
-              onClick={() => onPageChange?.(pagination.page + 1)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            >
-              Next <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
+      {pagination && (
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          totalRecords={pagination.total}
+          pageSize={pagination.limit}
+          onPageChange={onPageChange}
+          onLimitChange={onLimitChange}
+          loading={loading}
+          className="bg-slate-50/60"
+        />
       )}
     </div>
   );

@@ -1,12 +1,13 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { NotificationItem } from "./NotificationItem";
 import { NotificationEmptyState } from "./NotificationEmptyState";
+import { Pagination } from "../../../components/ui/Pagination";
 
 export function NotificationList({
   notifications = [],
   loading = false,
   pagination = null,
   onPageChange,
+  onLimitChange,
   onMarkRead,
   onMarkUnread,
   onDismiss,
@@ -44,30 +45,17 @@ export function NotificationList({
         />
       ))}
 
-      {pagination && pagination.totalPages > 1 && onPageChange && (
-        <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
-          <span>
-            Page <strong>{pagination.page}</strong> of{" "}
-            <strong>{pagination.totalPages}</strong> ({pagination.total} total)
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={pagination.page <= 1}
-              onClick={() => onPageChange(pagination.page - 1)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold hover:bg-slate-50 disabled:opacity-40"
-            >
-              <ChevronLeft size={14} /> Prev
-            </button>
-            <button
-              type="button"
-              disabled={pagination.page >= pagination.totalPages}
-              onClick={() => onPageChange(pagination.page + 1)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold hover:bg-slate-50 disabled:opacity-40"
-            >
-              Next <ChevronRight size={14} />
-            </button>
-          </div>
+      {pagination && onPageChange && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalRecords={pagination.total}
+            pageSize={pagination.limit}
+            onPageChange={onPageChange}
+            onLimitChange={onLimitChange}
+            loading={loading}
+          />
         </div>
       )}
     </div>
