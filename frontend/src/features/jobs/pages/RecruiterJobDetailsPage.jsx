@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   Eye,
+  Sparkles,
 } from "lucide-react";
 
 import { jobsApi } from "../api/jobsApi";
