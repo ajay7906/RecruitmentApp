@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.env
+.env.local
+.git
+.gitignore
+tests
+coverage
+storage/resumes/*
+!storage/resumes/.gitkeep
+storage/resume-text/*
+!storage/resume-text/.gitkeep
