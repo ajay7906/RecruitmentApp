@@ -1,13 +1,18 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, BellRing } from "lucide-react";
 import { NotificationPreferences } from "../components/NotificationPreferences";
+import { useAuthStore } from "../../../stores/authStore";
 
 export function NotificationSettingsPage() {
+  const user = useAuthStore((s) => s.user);
+  const centerPath =
+    user?.role === "admin" ? "/admin/notifications" : "/app/notifications";
+
   return (
     <div className="space-y-6">
       <div>
         <Link
-          to="/app/notifications"
+          to={centerPath}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"
         >
           <ArrowLeft size={14} /> Back to Notification Center

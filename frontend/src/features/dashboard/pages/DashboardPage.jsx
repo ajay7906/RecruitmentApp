@@ -3,7 +3,6 @@ import {
   FileCheck2,
   UserRound,
   Building2,
-  ShieldCheck,
   ArrowUpRight,
   FileText,
   Sparkles,
@@ -42,32 +41,6 @@ function getDashboardCards(role) {
         icon: FileCheck2,
         to: "/app/recruiter/applications",
         note: "Screen resumes, update candidate stages, and record hiring notes.",
-      },
-    ];
-  }
-
-  if (role === "admin") {
-    return [
-      {
-        label: "Company Approvals",
-        value: "Review submissions",
-        icon: ShieldCheck,
-        to: "/app/admin/companies",
-        note: "Approve, reject, or suspend company registrations.",
-      },
-      {
-        label: "Job Management",
-        value: "Platform job listings",
-        icon: BriefcaseBusiness,
-        to: "/app/jobs/manage",
-        note: "Monitor and manage job openings across organizations.",
-      },
-      {
-        label: "All Applications",
-        value: "Platform applications",
-        icon: FileCheck2,
-        to: "/app/recruiter/applications",
-        note: "Monitor candidate applications and status pipelines.",
       },
     ];
   }

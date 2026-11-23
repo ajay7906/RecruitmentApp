@@ -1,4 +1,4 @@
-import { NavLink, Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
@@ -17,7 +17,6 @@ import {
   KeyRound,
   Settings,
   LogOut,
-  ArrowLeftRight,
 } from "lucide-react";
 
 const NAV_SECTIONS = [
@@ -111,13 +110,7 @@ export function AdminSidebar({ user, onNavigate, onLogout }) {
         })}
       </div>
 
-      <div className="border-t border-slate-800 p-4 space-y-2">
-        <Link
-          to="/app/dashboard"
-          className="flex w-full items-center gap-2.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white"
-        >
-          <ArrowLeftRight size={15} /> Switch to User Workspace
-        </Link>
+      <div className="border-t border-slate-800 p-4">
         <button
           type="button"
           onClick={onLogout}
