@@ -16,4 +16,8 @@ router.get('/jobs/:jobId/ranking', requireRole('recruiter', 'admin'), controller
 router.post('/recommendations', requireRole('candidate', 'recruiter', 'admin'), controller.recommendJobs);
 router.get('/resumes/:resumeId/status', requireRole('candidate', 'recruiter', 'admin'), controller.getResumeProcessingStatus);
 
+// AI Generation: Job Descriptions & Tailored Interview Kits
+router.post('/jobs/generate-description', requireRole('recruiter', 'admin'), controller.generateJobDescription);
+router.post('/interviews/tailored-questions', requireRole('recruiter', 'admin'), controller.generateTailoredInterviewQuestions);
+
 module.exports = router;

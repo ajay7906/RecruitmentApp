@@ -64,3 +64,13 @@ exports.getResumeProcessingStatus = asyncHandler(async (req, res) => {
   const result = await aiService.getResumeProcessingStatus(resumeId, req.user);
   res.status(200).json(result);
 });
+
+exports.generateJobDescription = asyncHandler(async (req, res) => {
+  const result = await aiService.generateJobDescription(req.body || {}, req.user);
+  res.status(200).json({ success: true, data: result });
+});
+
+exports.generateTailoredInterviewQuestions = asyncHandler(async (req, res) => {
+  const result = await aiService.generateTailoredInterviewQuestions(req.body || {}, req.user);
+  res.status(200).json({ success: true, data: result });
+});

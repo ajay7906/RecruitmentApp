@@ -66,4 +66,20 @@ export const aiApi = {
     const { data } = await apiClient.get(`/ai/resumes/${resumeId}/status`);
     return data;
   },
+
+  /**
+   * AI-powered job description generator
+   */
+  async generateJobDescription(payload) {
+    const { data } = await apiClient.post("/ai/jobs/generate-description", payload);
+    return data?.data ?? data;
+  },
+
+  /**
+   * Tailored AI Interview Question Generator & Scorecard Kit
+   */
+  async generateTailoredInterviewQuestions(payload) {
+    const { data } = await apiClient.post("/ai/interviews/tailored-questions", payload);
+    return data?.data ?? data;
+  },
 };

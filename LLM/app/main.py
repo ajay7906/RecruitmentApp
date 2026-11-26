@@ -4,6 +4,7 @@ from app.api.v1.matching_routes import router as matching_router
 from app.api.v1.ranking_routes import router as ranking_router
 from app.api.v1.recommendation_routes import router as recommendation_router
 from app.api.v1.resume_routes import router as resume_router
+from app.api.v1.generation_routes import router as generation_router
 from app.core.config import get_settings
 from app.core.database import check_database_health
 
@@ -22,6 +23,7 @@ app.include_router(resume_router, prefix="/internal/v1")
 app.include_router(matching_router, prefix="/internal/v1")
 app.include_router(ranking_router, prefix="/internal/v1")
 app.include_router(recommendation_router, prefix="/internal/v1")
+app.include_router(generation_router, prefix="/internal/v1")
 
 
 @app.get("/internal/v1/health")

@@ -17,6 +17,7 @@ import {
   FolderGit2,
   Award,
   CalendarPlus,
+  Sparkles,
   Languages as LanguagesIcon,
 } from "lucide-react";
 
@@ -30,6 +31,7 @@ import { StatusUpdateDialog } from "../components/StatusUpdateDialog";
 import { RecruiterNotes } from "../components/RecruiterNotes";
 import { InterviewRoundList } from "../../interviews/components/InterviewRoundList";
 import { HiringDecisionDialog } from "../../interviews/components/HiringDecisionDialog";
+import { AIInterviewKitModal } from "../../interviews/components/AIInterviewKitModal";
 import { EducationCard } from "../../candidate-profile/components/EducationCard";
 import { ExperienceCard } from "../../candidate-profile/components/ExperienceCard";
 import { LoadingState } from "../../../components/feedback/LoadingState";
@@ -45,6 +47,7 @@ export function RecruiterApplicationReviewPage() {
     targetStatus: "",
   });
   const [hiringDecisionOpen, setHiringDecisionOpen] = useState(false);
+  const [aiInterviewKitOpen, setAiInterviewKitOpen] = useState(false);
 
   const query = useQuery({
     queryKey: ["applications", "recruiter-detail", id],
@@ -281,6 +284,16 @@ export function RecruiterApplicationReviewPage() {
                 </Button>
               </Link>
             )}
+
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-1.5 py-2 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              onClick={() => setAiInterviewKitOpen(true)}
+            >
+              <Sparkles size={14} className="text-indigo-600" />
+              AI Interview Kit
+            </Button>
 
             {["SHORTLISTED", "INTERVIEW", "OFFERED"].includes(app.status) && (
               <Button
@@ -706,6 +719,14 @@ export function RecruiterApplicationReviewPage() {
         isPending={hiringDecisionMutation.isPending}
         onClose={() => setHiringDecisionOpen(false)}
         onConfirm={(payload) => hiringDecisionMutation.mutate(payload)}
+      />
+      <AIInterviewKitModal
+        isOpen={aiInterviewKitOpen}
+        onClose={() => setAiInterviewKitOpen(false)}
+        applicationId={app.id}
+        jobId={app.jobId}
+        candidateName={candidateName}
+        jobTitle={app.job?.title || app.jobSnapshot?.title || "Role"}
       />
     </div>
   );

@@ -209,6 +209,22 @@ async function recommendJobsForCandidate(payload, context = {}) {
   });
 }
 
+async function generateJobDescription(payload, context = {}) {
+  return requestPythonService('/internal/v1/jobs/generate-description', {
+    method: 'POST',
+    body: payload,
+    context,
+  });
+}
+
+async function generateTailoredInterviewQuestions(payload, context = {}) {
+  return requestPythonService('/internal/v1/interviews/generate-questions', {
+    method: 'POST',
+    body: payload,
+    context,
+  });
+}
+
 module.exports = {
   enqueueResumeProcessingEvent,
   triggerResumeProcessing,
@@ -220,4 +236,6 @@ module.exports = {
   rankCandidatesForJob,
   getJobRanking,
   recommendJobsForCandidate,
+  generateJobDescription,
+  generateTailoredInterviewQuestions,
 };

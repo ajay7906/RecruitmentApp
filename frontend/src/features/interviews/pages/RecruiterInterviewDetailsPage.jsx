@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import {
   ArrowLeft,
   CalendarClock,
+  Sparkles,
   CheckCircle2,
   XCircle,
   UserX,
@@ -31,6 +32,7 @@ import { InterviewTimeline } from '../components/InterviewTimeline'
 import { RescheduleDialog } from '../components/RescheduleDialog'
 import { CancelInterviewDialog } from '../components/CancelInterviewDialog'
 import { HiringDecisionDialog } from '../components/HiringDecisionDialog'
+import { AIInterviewKitModal } from '../components/AIInterviewKitModal'
 import { formatInterviewTimeRange } from '../schema/interviewSchemas'
 
 export function RecruiterInterviewDetailsPage() {
@@ -42,6 +44,7 @@ export function RecruiterInterviewDetailsPage() {
   const [prefillRescheduleReq, setPrefillRescheduleReq] = useState(null)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [decisionOpen, setDecisionOpen] = useState(false)
+  const [aiInterviewKitOpen, setAiInterviewKitOpen] = useState(false)
 
   const detailQuery = useQuery({
     queryKey: ['interviews', 'recruiter-detail', id],
@@ -223,6 +226,15 @@ export function RecruiterInterviewDetailsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-1.5 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              onClick={() => setAiInterviewKitOpen(true)}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+              Tailored Interview Kit
+            </Button>
             {!isLocked ? (
               <>
                 <Button
@@ -468,6 +480,14 @@ export function RecruiterInterviewDetailsPage() {
         isPending={decisionMutation.isPending}
         onClose={() => setDecisionOpen(false)}
         onConfirm={(payload) => decisionMutation.mutate(payload)}
+      />
+      <AIInterviewKitModal
+        isOpen={aiInterviewKitOpen}
+        onClose={() => setAiInterviewKitOpen(false)}
+        applicationId={interview?.applicationId}
+        jobId={interview?.jobId}
+        candidateName={interview?.candidate?.fullName || "Candidate"}
+        jobTitle={interview?.job?.title || "Role"}
       />
     </div>
   )

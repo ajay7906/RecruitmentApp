@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -11,6 +11,7 @@ import {
   Save,
   Send,
   Building2,
+  Wand2,
 } from "lucide-react";
 
 import {
@@ -32,6 +33,7 @@ import { BenefitsInput } from "./BenefitsInput";
 import { SalaryInput } from "./SalaryInput";
 import { LocationInput } from "./LocationInput";
 import { ApplicationSettings } from "./ApplicationSettings";
+import { AIJobDescriptionModal } from "./AIJobDescriptionModal";
 import { Button } from "../../../components/ui/Button";
 
 export function JobForm({
@@ -51,6 +53,7 @@ export function JobForm({
     watch,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(jobFormSchema),
@@ -75,6 +78,30 @@ export function JobForm({
     onSaveAndPublish?.(cleanJobPayload(values, !isEditing));
   }
 
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+
+  function handleApplyAiJob(aiData) {
+    if (!aiData) return;
+    if (aiData.title) setValue("title", aiData.title, { shouldValidate: true });
+    if (aiData.description) setValue("description", aiData.description, { shouldValidate: true });
+    if (aiData.summary) setValue("summary", aiData.summary, { shouldValidate: true });
+    if (Array.isArray(aiData.responsibilities) && aiData.responsibilities.length) {
+      setValue("responsibilities", aiData.responsibilities, { shouldValidate: true });
+    }
+    if (Array.isArray(aiData.required_skills) && aiData.required_skills.length) {
+      setValue("skills", aiData.required_skills, { shouldValidate: true });
+    }
+    if (aiData.min_experience_years != null) {
+      setValue("minExperience", Number(aiData.min_experience_years), { shouldValidate: true });
+    }
+    if (aiData.max_experience_years != null) {
+      setValue("maxExperience", Number(aiData.max_experience_years), { shouldValidate: true });
+    }
+    if (aiData.suggested_education_level) {
+      setValue("educationLevel", aiData.suggested_education_level, { shouldValidate: true });
+    }
+  }
+
   return (
     <form
       id="job-management-form"
@@ -82,6 +109,31 @@ export function JobForm({
       noValidate
       className="space-y-6"
     >
+      {/* ── AI Job Description Assistant Banner ── */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-brand/20 bg-gradient-to-r from-brand/5 via-indigo-50/50 to-brand/5 p-4 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-brand to-indigo-600 text-white shadow-xs">
+            <Sparkles size={20} />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-slate-900">
+              Draft with Gemini AI Assistant
+            </h4>
+            <p className="text-xs text-slate-500">
+              Auto-generate structured description, key responsibilities, and required skill tags in seconds.
+            </p>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          onClick={() => setAiModalOpen(true)}
+          icon={Wand2}
+          className="bg-brand text-white hover:bg-brand/90"
+        >
+          Generate with AI
+        </Button>
+      </div>
       {/* ── A. Basic Job Information ── */}
       <ProfileSection
         title="Basic job information"
@@ -530,6 +582,13 @@ export function JobForm({
           </Button>
         )}
       </div>
+          <AIJobDescriptionModal
+        isOpen={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        onApply={handleApplyAiJob}
+        initialTitle={watch("title") || ""}
+        initialCompany={selectedCompany}
+      />
     </form>
   );
 }

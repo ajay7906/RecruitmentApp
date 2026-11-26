@@ -16,6 +16,8 @@ import { ApplicationStatistics } from "../components/ApplicationStatistics";
 import { ApplicationSearch } from "../components/ApplicationSearch";
 import { ApplicationFilters } from "../components/ApplicationFilters";
 import { ApplicationTable } from "../components/ApplicationTable";
+import { KanbanBoard } from "../components/KanbanBoard";
+import { AIInterviewKitModal } from "../../interviews/components/AIInterviewKitModal";
 import { StatusUpdateDialog } from "../components/StatusUpdateDialog";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { ErrorState } from "../../../components/feedback/ErrorState";
@@ -42,6 +44,8 @@ export function RecruiterApplicationsDashboardPage() {
   });
 
   const [statusDialogApp, setStatusDialogApp] = useState(null);
+  const [viewMode, setViewMode] = useState("kanban"); // "kanban" | "table"
+  const [aiKitApp, setAiKitApp] = useState(null);
 
   const companiesQuery = useQuery({
     queryKey: ["companies", "my-select"],
@@ -233,6 +237,15 @@ export function RecruiterApplicationsDashboardPage() {
       )}
 
       {/* Status Update Modal */}
+      <AIInterviewKitModal
+        isOpen={Boolean(aiKitApp)}
+        onClose={() => setAiKitApp(null)}
+        applicationId={aiKitApp?.id}
+        jobId={aiKitApp?.jobId}
+        candidateName={aiKitApp?.candidate?.fullName || aiKitApp?.candidateSnapshot?.fullName || "Candidate"}
+        jobTitle={aiKitApp?.job?.title || aiKitApp?.jobSnapshot?.title || "Role"}
+      />
+
       <StatusUpdateDialog
         open={Boolean(statusDialogApp)}
         application={statusDialogApp}
