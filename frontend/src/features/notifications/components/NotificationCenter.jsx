@@ -4,6 +4,7 @@ import { CheckCheck, Settings, History, Inbox, Search } from "lucide-react";
 import { toast } from "sonner";
 import { notificationsApi } from "../api/notificationsApi";
 import { NotificationList } from "./NotificationList";
+import { useAuthStore } from "../../../stores/authStore";
 
 const CATEGORIES = [
   "ALL",
@@ -19,6 +20,11 @@ const CATEGORIES = [
 ];
 
 export function NotificationCenter() {
+  const user = useAuthStore((s) => s.user);
+  const settingsPath =
+    user?.role === "admin"
+      ? "/admin/notification-settings"
+      : "/app/notification-settings";
   const [activeTab, setActiveTab] = useState("inbox"); // "inbox" | "history"
   const [category, setCategory] = useState("ALL");
   const [readFilter, setReadFilter] = useState("ALL"); // "ALL" | "false" | "true"
@@ -134,7 +140,7 @@ export function NotificationCenter() {
             </button>
           )}
           <Link
-            to="/app/notification-settings"
+            to={settingsPath}
             className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800"
           >
             <Settings size={15} /> Notification Preferences

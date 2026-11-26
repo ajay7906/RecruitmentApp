@@ -1,7 +1,12 @@
 import { Link, Outlet } from "react-router-dom";
 import { BriefcaseBusiness } from "lucide-react";
+import { useAuthStore } from "../../stores/authStore";
 
 export function PublicLayout() {
+  const user = useAuthStore((state) => state.user);
+  const dashboardPath =
+    user?.role === "admin" ? "/admin/dashboard" : "/app/dashboard";
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-slate-200">
@@ -24,18 +29,29 @@ export function PublicLayout() {
             </Link>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              className="text-sm font-medium text-slate-600 hover:text-slate-900"
-              to="/login"
-            >
-              Log in
-            </Link>
-            <Link
-              className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-              to="/register"
-            >
-              Get started
-            </Link>
+            {user ? (
+              <Link
+                className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                to={dashboardPath}
+              >
+                {user.role === "admin" ? "Admin Console" : "Go to Workspace"}
+              </Link>
+            ) : (
+              <>
+                <Link
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                  to="/login"
+                >
+                  Log in
+                </Link>
+                <Link
+                  className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                  to="/register"
+                >
+                  Get started
+                </Link>
+              </>
+            )}
           </div>
         </nav>
       </header>

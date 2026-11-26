@@ -16,7 +16,9 @@ export function NotificationBell() {
 
   const isAdmin = user?.role === "admin";
   const centerPath = isAdmin ? "/admin/notifications" : "/app/notifications";
-  const settingsPath = "/app/notification-settings";
+  const settingsPath = isAdmin
+    ? "/admin/notification-settings"
+    : "/app/notification-settings";
 
   const fetchUnreadCount = useCallback(async () => {
     if (!user) return;

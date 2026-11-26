@@ -27,8 +27,16 @@ export function LoginPage() {
 
       setAuth(user, accessToken);
       toast.success("Signed in successfully");
-      const defaultPath = user.role === "admin" ? "/admin/dashboard" : "/app/dashboard";
-      navigate(location.state?.from?.pathname || defaultPath, { replace: true });
+      const fromPath = location.state?.from?.pathname;
+      const targetPath =
+        user.role === "admin"
+          ? fromPath?.startsWith("/admin")
+            ? fromPath
+            : "/admin/dashboard"
+          : fromPath && !fromPath.startsWith("/admin")
+          ? fromPath
+          : "/app/dashboard";
+      navigate(targetPath, { replace: true });
     } catch (error) {
       toast.error(error.response?.data?.message || error.message || "Unable to sign in");
     } finally {

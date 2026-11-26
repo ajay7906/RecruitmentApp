@@ -9,6 +9,11 @@ export function ProtectedRoute({ children, allowedRoles }) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
+  // Keep admin users strictly within the admin panel experience.
+  if (user.role === "admin") {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
   // UI-level role routing only. The backend must enforce permissions on every API.
   if (allowedRoles?.length && !allowedRoles.includes(user.role)) {
     return <Navigate to="/app/dashboard" replace />;

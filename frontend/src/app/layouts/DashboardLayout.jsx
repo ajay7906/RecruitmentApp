@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   UserRound,
   Building2,
-  ShieldCheck,
   Search,
   FileText,
   FileUp,
@@ -42,7 +41,7 @@ function getNavItems(role) {
     );
   }
 
-  if (role === "recruiter" || role === "admin") {
+  if (role === "recruiter") {
     items.push(
       {
         to: "/app/companies",
@@ -67,26 +66,6 @@ function getNavItems(role) {
     );
   }
 
-  if (role === "admin") {
-    items.push(
-      {
-        to: "/admin/dashboard",
-        label: "Admin Console",
-        icon: ShieldCheck,
-      },
-      {
-        to: "/admin/companies/approvals",
-        label: "Company approvals",
-        icon: ShieldCheck,
-      },
-      {
-        to: "/admin/jobs/approvals",
-        label: "Job moderation",
-        icon: ShieldCheck,
-      }
-    );
-  }
-
   items.push(
     { to: "/app/jobs", label: "Find jobs", icon: Search, end: true },
     { to: "/app/applications", label: "Applications", icon: FileText },
@@ -94,7 +73,7 @@ function getNavItems(role) {
     { to: "/app/analytics", label: "Analytics", icon: BarChart3 }
   );
 
-  if (role === "recruiter" || role === "admin") {
+  if (role === "recruiter") {
     items.push({
       to: "/app/reports",
       label: "Reports & Export",
