@@ -12,7 +12,7 @@ COPY package*.json ./
 RUN npm ci
 
 # Accept API base URL build argument (Vite bakes VITE_* variables in at build time)
-ARG VITE_API_BASE_URL
+ARG VITE_API_BASE_URL=https://34.27.180.148.sslip.io/api/v1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # Copy source code and build production bundle
