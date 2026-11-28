@@ -59,7 +59,7 @@ describe('Complete Admin Management Module Integration & Regression Suite', () =
     Object.assign(process.env, {
       NODE_ENV: 'test',
       DATABASE_URL: testDb.url,
-      DB_POOL_MAX: '1',
+      DB_POOL_MAX: '5',
       CLIENT_URL: 'http://localhost:5173',
       JWT_ACCESS_SECRET: 'test_admin_suite_jwt_secret_key_2026',
       ACCESS_TOKEN_TTL: '15m',

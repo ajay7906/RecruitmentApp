@@ -12,6 +12,10 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({
   adapter,
   log: env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+  transactionOptions: {
+    maxWait: 10000, // 10 seconds
+    timeout: 15000, // 15 seconds
+  }
 });
 
 module.exports = prisma;
